@@ -1,4 +1,6 @@
 /** @type {import('next').NextConfig} */
-const nextConfig = {};
+const nextConfig = {
+  // Configuración existente
+};
 
-export default nextConfig;
+module.exports = nextConfig;
