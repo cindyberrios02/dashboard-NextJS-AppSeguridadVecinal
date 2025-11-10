@@ -23,7 +23,8 @@ export default function NewUser() {
     direccion: '',
     latitud: null,
     longitud: null,
-    role: 'USER'
+    sector: '',
+    role: 'VECINO'
   });
 
   const handleChange = (e) => {
@@ -221,8 +222,9 @@ export default function NewUser() {
                     onChange={handleChange}
                     className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                   >
-                    <option value="USER">Usuario</option>
-                    <option value="ADMIN">Administrador</option>
+                    <option value="VECINO">Vecino</option>
+                    <option value="ADMIN_VILLA">Administrador Villa</option>
+                    <option value="SUPER_ADMIN">Super Administrador</option>
                   </select>
                 </div>
               </div>
@@ -244,6 +246,25 @@ export default function NewUser() {
                     onChange={handleChange}
                     className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                   />
+                </div>
+
+                {/* AGREGAR este div completo para el sector */}
+                <div className="sm:col-span-2">
+                  <label htmlFor="sector" className="block text-sm font-medium text-gray-700">
+                    Sector
+                  </label>
+                  <input
+                    type="text"
+                    name="sector"
+                    id="sector"
+                    placeholder="Ej: Plaza Central, Calle 1, Pasaje Los Álamos"
+                    value={formData.sector}
+                    onChange={handleChange}
+                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  />
+                  <p className="mt-1 text-sm text-gray-500">
+                    Especifica el sector o área dentro de la villa donde vive el usuario
+                  </p>
                 </div>
 
                 <div>
