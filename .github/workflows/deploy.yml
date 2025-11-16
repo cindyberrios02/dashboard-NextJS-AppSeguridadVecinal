@@ -13,40 +13,13 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v3
 
-    - name: Report largest tracked & untracked files
-      run: |
-        echo "=== Top largest TRACKED files (repo) ==="
-        git ls-files -z | xargs -0 du -h 2>/dev/null | sort -hr | head -n 30 || true
-
-        echo "=== Top largest UNTRACKED files (workspace) ==="
-        git ls-files --exclude-standard -oi -z | xargs -0 du -h 2>/dev/null | sort -hr | head -n 30 || true
-
-        echo "=== Disk usage summary ==="
-        du -sh . || true
-
-    - name: Clean large / untracked junk files (safe)
-      run: |
-        echo "Removing common untracked junk files (logs, .DS_Store, caches) and untracked files >50MB"
-        # Remove common ignored junk files
-        find . -type f -name '.DS_Store' -delete || true
-        find . -type f -name '*.log' -delete || true
-        find . -type f -name '*.tgz' -delete || true
-        find . -type f -name '*.zip' -delete || true
-        rm -rf .cache || true
-        rm -rf coverage || true
-        # Remove untracked files larger than 50MB (likely accidental large blobs). Safe: only untracked files.
-        git ls-files --exclude-standard -oi -z \
-          | xargs -0 -r du -b 2>/dev/null \
-          | awk '$1>50000000{print $2}' \
-          | xargs -r -d '\n' rm -v || true
-
     - name: Setup Node
       uses: actions/setup-node@v3
       with:
         node-version: 18
 
-    - name: Install dependencies (CI)
-      run: npm ci
+    - name: Install dependencies
+      run: npm install
 
     - name: Build Next.js with environment vars
       env:
@@ -54,90 +27,24 @@ jobs:
         NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
       run: npm run build
 
-    - name: Prune devDependencies (prepare node_modules for server)
-      # remove devDependencies so node_modules only contains production deps to rsync
-      run: npm prune --production || true
-
     - name: Setup SSH key
       run: |
         mkdir -p ~/.ssh
-        printf '%s\n' "${{ secrets.SERVER_SSH_KEY }}" | sed 's/\r$//' > ~/.ssh/id_ed25519
+        echo "${{ secrets.SERVER_SSH_KEY }}" > ~/.ssh/id_ed25519
         chmod 600 ~/.ssh/id_ed25519
-        if ssh-keygen -y -f ~/.ssh/id_ed25519 > ~/.ssh/id_ed25519.pub 2>/dev/null; then
-          echo "Derived public key written to ~/.ssh/id_ed25519.pub"
-          ssh-keygen -lf ~/.ssh/id_ed25519.pub || true
-        else
-          echo "Could not derive public key from private key. Ensure the secret contains a valid OpenSSH/ED25519 private key."
-        fi
-        ssh-keyscan -H ${{ secrets.SERVER_IP }} >> ~/.ssh/known_hosts
-        chmod 644 ~/.ssh/known_hosts
-        eval "$(ssh-agent -s)"
-        ssh-add ~/.ssh/id_ed25519 || true
-
-    - name: Test SSH connectivity
-      run: |
-        echo "Derived public key (copy this to server's ~/.ssh/authorized_keys if missing):"
-        cat ~/.ssh/id_ed25519.pub || true
-        ssh -vvv -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o PreferredAuthentications=publickey -o StrictHostKeyChecking=yes -o BatchMode=yes ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} 'echo "SSH OK"'
 
     - name: Deploy to server
       run: |
-        # SSH options: keepalive and reasonable timeouts to reduce "Broken pipe"
-        SSH_OPTS="-o IdentitiesOnly=yes -o PreferredAuthentications=publickey -o StrictHostKeyChecking=yes -o ServerAliveInterval=60 -o ServerAliveCountMax=5 -o ConnectTimeout=10"
-        # Excluir patrones comunes de "basura" para no sincronizarlos al servidor
-        RSYNC_EXCLUDES="--exclude .git/ \
-        --exclude '*.log' \
-        --exclude '.DS_Store' \
-        --exclude '.env*' \
-        --exclude '.vscode/' \
-        --exclude 'coverage/' \
-        --exclude '.cache/' \
-        --exclude 'tests/' \
-        --exclude '*.tgz' \
-        --exclude '*.zip' \
-        --exclude 'node_modules/**/.cache' \
-        --exclude '.next/cache/'"
+        ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
+          mkdir -p ~/seguridad_vecinal
+        EOF
 
-        TARGET_DIR="~/seguridad_vecinal"
+        rsync -avz --delete .next/ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:~/seguridad_vecinal/.next/
+        rsync -avz --delete public/ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:~/seguridad_vecinal/public/
+        rsync -avz package.json ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:~/seguridad_vecinal/
 
-        # Ensure target dir exists
-        ssh $SSH_OPTS -i ~/.ssh/id_ed25519 ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "mkdir -p $TARGET_DIR" || true
-
-        # Sync build artifacts and package files (NO node_modules)
-        rsync -avz --partial --delete $RSYNC_EXCLUDES -e "ssh $SSH_OPTS -i ~/.ssh/id_ed25519" .next/ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:$TARGET_DIR/.next/
-        rsync -avz --partial --delete $RSYNC_EXCLUDES -e "ssh $SSH_OPTS -i ~/.ssh/id_ed25519" public/ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:$TARGET_DIR/public/
-        rsync -avz --partial -e "ssh $SSH_OPTS -i ~/.ssh/id_ed25519" $RSYNC_EXCLUDES package.json package-lock.json ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:$TARGET_DIR/
-
-        # On remote: install production deps from lockfile and restart app with pm2
-        ssh $SSH_OPTS -i ~/.ssh/id_ed25519 ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
-          set -euo pipefail
-          cd ~/seguridad_vecinal || exit 1
-
-          echo "=== Remote environment info ==="
-          node -v || true
-          npm -v || true
-          df -h . || true
-
-          echo "Removing any existing node_modules to ensure clean install..."
-          rm -rf node_modules || true
-
-          if [ -f package-lock.json ]; then
-            echo "Installing production dependencies from package-lock.json (npm ci --omit=dev)"
-            npm ci --omit=dev --no-audit --no-fund --prefer-offline || npm ci --production --no-audit --no-fund || npm install --production --no-audit --no-fund
-          else
-            echo "No package-lock.json found — running npm install --production"
-            npm install --production --no-audit --no-fund || true
-          fi
-
-          if ! command -v pm2 >/dev/null 2>&1; then
-            echo "pm2 not found, installing globally..."
-            npm install -g pm2 --no-audit --no-fund || true
-          fi
-          pm2 -v || true
-
-          echo "Starting or restarting app with pm2 (using --update-env)"
-          pm2 restart seguridad_vecinal --update-env || pm2 start npm --name seguridad_vecinal -- start
-
-          echo "Persisting pm2 process list and attempting startup registration"
-          pm2 save || true
-          pm2
+        ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
+          cd ~/seguridad_vecinal
+          npm install --omit=dev
+          pm2 restart seguridad_vecinal || pm2 start npm --name seguridad_vecinal -- start
+        EOF
