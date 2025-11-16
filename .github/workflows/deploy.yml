@@ -39,12 +39,27 @@ jobs:
           mkdir -p ~/seguridad_vecinal
         EOF
 
+        # rsync build artifacts and public files
         rsync -avz --delete .next/ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:~/seguridad_vecinal/.next/
         rsync -avz --delete public/ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:~/seguridad_vecinal/public/
-        rsync -avz package.json ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:~/seguridad_vecinal/
+
+        # sync package.json and package-lock.json (ignore missing lockfile)
+        rsync -avz package.json ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:~/seguridad_vecinal/ || true
+        rsync -avz package-lock.json ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:~/seguridad_vecinal/ || true
 
         ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
+          set -e
           cd ~/seguridad_vecinal
-          npm install --omit=dev
+
+          # ensure a clean node_modules to avoid ENOTEMPTY / rename errors
+          rm -rf node_modules
+
+          # if package-lock.json exists on the server, use npm ci for a clean install
+          if [ -f package-lock.json ]; then
+            npm ci --omit=dev --no-audit --no-fund
+          else
+            npm install --omit=dev --no-audit --no-fund
+          fi
+
           pm2 restart seguridad_vecinal || pm2 start npm --name seguridad_vecinal -- start
         EOF
