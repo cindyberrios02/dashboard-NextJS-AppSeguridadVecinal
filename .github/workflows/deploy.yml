@@ -13,6 +13,33 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v3
 
+    - name: Report largest tracked & untracked files
+      run: |
+        echo "=== Top largest TRACKED files (repo) ==="
+        git ls-files -z | xargs -0 du -h 2>/dev/null | sort -hr | head -n 30 || true
+
+        echo "=== Top largest UNTRACKED files (workspace) ==="
+        git ls-files --exclude-standard -oi -z | xargs -0 du -h 2>/dev/null | sort -hr | head -n 30 || true
+
+        echo "=== Disk usage summary ==="
+        du -sh . || true
+
+    - name: Clean large / untracked junk files (safe)
+      run: |
+        echo "Removing common untracked junk files (logs, .DS_Store, caches) and untracked files >50MB"
+        # Remove common ignored junk files
+        find . -type f -name '.DS_Store' -delete || true
+        find . -type f -name '*.log' -delete || true
+        find . -type f -name '*.tgz' -delete || true
+        find . -type f -name '*.zip' -delete || true
+        rm -rf .cache || true
+        rm -rf coverage || true
+        # Remove untracked files larger than 50MB (likely accidental large blobs). Safe: only untracked files.
+        git ls-files --exclude-standard -oi -z \
+          | xargs -0 -r du -b 2>/dev/null \
+          | awk '$1>50000000{print $2}' \
+          | xargs -r -d '\n' rm -v || true
+
     - name: Setup Node
       uses: actions/setup-node@v3
       with:
@@ -34,49 +61,51 @@ jobs:
     - name: Setup SSH key
       run: |
         mkdir -p ~/.ssh
-
-        # Write private key, strip CRLFs (handles secrets pasted from Windows)
         printf '%s\n' "${{ secrets.SERVER_SSH_KEY }}" | sed 's/\r$//' > ~/.ssh/id_ed25519
         chmod 600 ~/.ssh/id_ed25519
-
-        # Try to derive the public key from the private key and print fingerprint for debugging
         if ssh-keygen -y -f ~/.ssh/id_ed25519 > ~/.ssh/id_ed25519.pub 2>/dev/null; then
           echo "Derived public key written to ~/.ssh/id_ed25519.pub"
-          echo "Public key fingerprint (compare this with server's authorized_keys):"
           ssh-keygen -lf ~/.ssh/id_ed25519.pub || true
         else
           echo "Could not derive public key from private key. Ensure the secret contains a valid OpenSSH/ED25519 private key."
         fi
-
-        # Add server to known_hosts to avoid host key prompts
         ssh-keyscan -H ${{ secrets.SERVER_IP }} >> ~/.ssh/known_hosts
         chmod 644 ~/.ssh/known_hosts
-
-        # Start ssh-agent and add key (if key has a passphrase this will fail non-interactively)
         eval "$(ssh-agent -s)"
         ssh-add ~/.ssh/id_ed25519 || true
 
     - name: Test SSH connectivity
       run: |
-        # Show verbose SSH output to help diagnose "Permission denied (publickey)"
         echo "Derived public key (copy this to server's ~/.ssh/authorized_keys if missing):"
         cat ~/.ssh/id_ed25519.pub || true
-
-        # Use IdentitiesOnly and prefer publickey to ensure the provided key is used
         ssh -vvv -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o PreferredAuthentications=publickey -o StrictHostKeyChecking=yes -o BatchMode=yes ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} 'echo "SSH OK"'
 
     - name: Deploy to server
       run: |
+        # Excluir patrones comunes de "basura" para no sincronizarlos al servidor
+        RSYNC_EXCLUDES="--exclude .git/ \
+        --exclude '*.log' \
+        --exclude '.DS_Store' \
+        --exclude '.env*' \
+        --exclude '.vscode/' \
+        --exclude 'coverage/' \
+        --exclude '.cache/' \
+        --exclude 'tests/' \
+        --exclude '*.tgz' \
+        --exclude '*.zip' \
+        --exclude 'node_modules/**/.cache' \
+        --exclude '.next/cache/'"
+
         # Ensure target dir exists
         ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o PreferredAuthentications=publickey -o StrictHostKeyChecking=yes ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} 'mkdir -p ~/seguridad_vecinal'
 
-        # Sync build artifacts and package.json
-        rsync -avz -e "ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o PreferredAuthentications=publickey -o StrictHostKeyChecking=yes" --delete .next/ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:~/seguridad_vecinal/.next/
-        rsync -avz -e "ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o PreferredAuthentications=publickey -o StrictHostKeyChecking=yes" --delete public/ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:~/seguridad_vecinal/public/
-        rsync -avz -e "ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o PreferredAuthentications=publickey -o StrictHostKeyChecking=yes" package.json ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:~/seguridad_vecinal/
+        # Sync build artifacts and package.json (excluyendo basura). Also sync package-lock.json para consistencia.
+        rsync -avz -e "ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o PreferredAuthentications=publickey -o StrictHostKeyChecking=yes" --delete $RSYNC_EXCLUDES .next/ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:~/seguridad_vecinal/.next/
+        rsync -avz -e "ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o PreferredAuthentications=publickey -o StrictHostKeyChecking=yes" --delete $RSYNC_EXCLUDES public/ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:~/seguridad_vecinal/public/
+        rsync -avz -e "ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o PreferredAuthentications=publickey -o StrictHostKeyChecking=yes" $RSYNC_EXCLUDES package.json package-lock.json ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:~/seguridad_vecinal/
 
         # Sync node_modules from CI runner to server (we used npm ci above and pruned devDependencies)
-        rsync -avz -e "ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o PreferredAuthentications=publickey -o StrictHostKeyChecking=yes" --delete node_modules/ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:~/seguridad_vecinal/node_modules/
+        rsync -avz -e "ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o PreferredAuthentications=publickey -o StrictHostKeyChecking=yes" --delete $RSYNC_EXCLUDES node_modules/ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:~/seguridad_vecinal/node_modules/
 
         # On remote: ensure pm2 present, start/restart app with updated env, persist process list and show logs
         ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o PreferredAuthentications=publickey -o StrictHostKeyChecking=yes ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
