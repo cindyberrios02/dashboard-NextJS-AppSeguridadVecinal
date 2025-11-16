@@ -61,5 +61,16 @@ jobs:
             npm install --omit=dev --no-audit --no-fund
           fi
 
-          pm2 restart seguridad_vecinal || pm2 start npm --name seguridad_vecinal -- start
+          # Try to restart using updated environment; if that fails, remove the old process and start fresh.
+          # Ensure NODE_ENV and PORT are set for the runtime process.
+          pm2 restart seguridad_vecinal --update-env || {
+            pm2 delete seguridad_vecinal || true
+            NODE_ENV=production PORT=3001 pm2 start npm --name seguridad_vecinal -- start --update-env
+          }
+
+          # show pm2 list to confirm status
+          pm2 list
         EOF
+
+    - name: Show PM2 error log (last 200 lines)
+      run: ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "tail -n 200 ~/.pm2/logs/seguridad_vecinal-error.log 2>/dev/null || echo 'PM2 error log not found'"
