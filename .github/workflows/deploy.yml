@@ -61,14 +61,10 @@ jobs:
             npm install --omit=dev --no-audit --no-fund
           fi
 
-          # Try to restart using updated environment; if that fails, remove the old process and start fresh.
-          # Ensure NODE_ENV and PORT are set for the runtime process.
-          pm2 restart seguridad_vecinal --update-env || {
-            pm2 delete seguridad_vecinal || true
-            NODE_ENV=production PORT=3001 pm2 start npm --name seguridad_vecinal -- start --update-env
-          }
+          # always recreate pm2 process so PORT and NODE_ENV are applied
+          pm2 delete seguridad_vecinal || true
+          NODE_ENV=production PORT=3001 pm2 start npm --name seguridad_vecinal -- start --update-env
 
-          # show pm2 list to confirm status
           pm2 list
         EOF
 
