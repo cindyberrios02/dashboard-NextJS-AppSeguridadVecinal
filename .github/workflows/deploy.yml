@@ -82,6 +82,8 @@ jobs:
 
     - name: Deploy to server
       run: |
+        # SSH options to keep connection alive and avoid broken pipe
+        SSH_OPTS="-o IdentitiesOnly=yes -o PreferredAuthentications=publickey -o StrictHostKeyChecking=yes -o ServerAliveInterval=60 -o ServerAliveCountMax=5 -o ConnectTimeout=10"
         # Excluir patrones comunes de "basura" para no sincronizarlos al servidor
         RSYNC_EXCLUDES="--exclude .git/ \
         --exclude '*.log' \
@@ -97,18 +99,15 @@ jobs:
         --exclude '.next/cache/'"
 
         # Ensure target dir exists
-        ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o PreferredAuthentications=publickey -o StrictHostKeyChecking=yes ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} 'mkdir -p ~/seguridad_vecinal'
+        ssh $SSH_OPTS -i ~/.ssh/id_ed25519 ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} 'mkdir -p ~/seguridad_vecinal'
 
-        # Sync build artifacts and package.json (excluyendo basura). Also sync package-lock.json para consistencia.
-        rsync -avz -e "ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o PreferredAuthentications=publickey -o StrictHostKeyChecking=yes" --delete $RSYNC_EXCLUDES .next/ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:~/seguridad_vecinal/.next/
-        rsync -avz -e "ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o PreferredAuthentications=publickey -o StrictHostKeyChecking=yes" --delete $RSYNC_EXCLUDES public/ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:~/seguridad_vecinal/public/
-        rsync -avz -e "ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o PreferredAuthentications=publickey -o StrictHostKeyChecking=yes" $RSYNC_EXCLUDES package.json package-lock.json ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:~/seguridad_vecinal/
+        # Sync build artifacts and package files (no node_modules)
+        rsync -avz --partial --delete $RSYNC_EXCLUDES -e "ssh $SSH_OPTS -i ~/.ssh/id_ed25519" .next/ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:~/seguridad_vecinal/.next/
+        rsync -avz --partial --delete $RSYNC_EXCLUDES -e "ssh $SSH_OPTS -i ~/.ssh/id_ed25519" public/ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:~/seguridad_vecinal/public/
+        rsync -avz --partial -e "ssh $SSH_OPTS -i ~/.ssh/id_ed25519" $RSYNC_EXCLUDES package.json package-lock.json ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:~/seguridad_vecinal/
 
-        # Sync node_modules from CI runner to server (we used npm ci above and pruned devDependencies)
-        rsync -avz -e "ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o PreferredAuthentications=publickey -o StrictHostKeyChecking=yes" --delete $RSYNC_EXCLUDES node_modules/ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:~/seguridad_vecinal/node_modules/
-
-        # On remote: ensure pm2 present, start/restart app with updated env, persist process list and show logs
-        ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o PreferredAuthentications=publickey -o StrictHostKeyChecking=yes ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
+        # On remote: install production deps from package-lock.json and start/restart app
+        ssh $SSH_OPTS -i ~/.ssh/id_ed25519 ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
           set -e
           cd ~/seguridad_vecinal
 
@@ -116,25 +115,23 @@ jobs:
           node -v || true
           npm -v || true
 
+          # Install production dependencies from lockfile; fall back to npm install --production
+          if [ -f package-lock.json ]; then
+            echo "Running npm ci --omit=dev"
+            npm ci --omit=dev --no-audit --no-fund || npm ci --production --no-audit --no-fund || npm install --production --no-audit --no-fund || true
+          else
+            echo "No package-lock.json found, running npm install --production"
+            npm install --production --no-audit --no-fund || true
+          fi
+
           if ! command -v pm2 >/dev/null 2>&1; then
-            echo "pm2 not found, attempting global install (may fail if server is low on memory)..."
+            echo "pm2 not found, attempting global install..."
             npm install -g pm2 --no-audit --no-fund || true
           fi
           pm2 -v || true
 
           echo "=== Start/restart app with pm2 (using --update-env) ==="
-          # Try to restart with updated env; if not found, start it
           pm2 restart seguridad_vecinal --update-env || pm2 start npm --name seguridad_vecinal -- start
 
-          # Persist pm2 list and attempt to register startup (may require sudo on some distros)
           pm2 save || true
-          pm2 startup -u $USER --hp /home/$USER || true
-
-          echo "=== pm2 status and description ==="
-          pm2 status || true
-          pm2 describe seguridad_vecinal || true
-
-          echo "=== Recent logs for seguridad_vecinal (diagnostics) ==="
-          # Non-interactive recent logs; --nostream prevents continuous streaming
-          pm2 logs seguridad_vecinal --lines 200 --nostream --timestamp || true
-        EOF
+          pm2
