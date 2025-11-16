@@ -19,60 +19,72 @@ export default function Dashboard() {
     fetchDashboardData();
   }, []);
 
-  const fetchDashboardData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      // Verificar si la variable de entorno existe
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-      console.log('API URL:', apiUrl); // Para debug
-      
-      if (!apiUrl) {
-        throw new Error('La variable NEXT_PUBLIC_API_URL no está configurada');
-      }
-      
-      // Llamada al endpoint correcto: /api/admin/dashboard/stats
-      const response = await fetch(`${apiUrl}/api/admin/dashboard/stats`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        mode: 'cors',
-      });
-      
-      console.log('Response status:', response.status); // Para debug
-      
-      if (!response.ok) {
-        throw new Error(`Error HTTP: ${response.status} - ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      console.log('Datos recibidos:', data); // Para debug
-      
-      setStats({
-        users: data.users || 0,
-        sales: data.sales || 0,
-        orders: data.orders || 0,
-        revenue: data.revenue || 0
-      });
-      
-    } catch (error) {
-      console.error('Error fetching dashboard data:', error);
-      setError(error.message);
-      
-      // Datos de ejemplo para desarrollo mientras resuelves problemas de conexión
-      setStats({
-        users: 1250,
-        sales: 45230,
-        orders: 189,
-        revenue: 95680
-      });
-    } finally {
-      setLoading(false);
+const fetchDashboardData = async () => {
+  try {
+    setLoading(true);
+    setError(null);
+    
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+    
+    if (!apiUrl) {
+      throw new Error('La variable NEXT_PUBLIC_API_URL no está configurada');
     }
-  };
+    
+    const token = localStorage.getItem('token');
+    
+    if (!token) {
+      throw new Error('No hay token de autenticación');
+    }
+    
+    const response = await fetch(`${apiUrl}/api/admin/dashboard/stats`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      mode: 'cors',
+    });
+    
+    console.log('Response status:', response.status);
+    
+    // ✅ SI EL TOKEN EXPIRÓ, REDIRIGIR AL LOGIN
+    if (response.status === 403 || response.status === 401) {
+      localStorage.clear();
+      window.location.href = '/login';
+      return;
+    }
+    
+    if (!response.ok) {
+      throw new Error(`Error HTTP: ${response.status} - ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    console.log('Datos recibidos:', data);
+    
+    setStats({
+      users: data.users || 0,
+      sales: data.sales || 0,
+      orders: data.orders || 0,
+      revenue: data.revenue || 0
+    });
+    
+  } catch (error) {
+    console.error('Error fetching dashboard data:', error);
+    setError(error.message);
+    
+    // Datos de ejemplo
+    setStats({
+      users: 1250,
+      sales: 45230,
+      orders: 189,
+      revenue: 95680
+    });
+  } finally {
+    setLoading(false);
+  }
+};
+      
 
   const statsData = [
     {

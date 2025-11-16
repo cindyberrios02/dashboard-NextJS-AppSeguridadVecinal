@@ -1,20 +1,23 @@
 // src/components/layout/Header.js
-import { BellIcon, Bars3Icon, UserCircleIcon } from '@heroicons/react/24/outline';
+import { BellIcon, Bars3Icon, UserCircleIcon, ArrowRightOnRectangleIcon } from '@heroicons/react/24/outline';
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { useState } from 'react';
 import { useRouter } from 'next/router';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function Header({ onMenuClick }) {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [showSearchResults, setShowSearchResults] = useState(false);
   const router = useRouter();
+  const { user, logout } = useAuth();
 
   // Opciones de navegación para el buscador global
   const searchOptions = [
     { name: 'Dashboard Principal', route: '/dashboard', keywords: ['dashboard', 'inicio', 'principal'] },
     { name: 'Gestión de Usuarios', route: '/dashboard/users', keywords: ['usuarios', 'users', 'gestión'] },
     { name: 'Crear Usuario', route: '/dashboard/users/new', keywords: ['crear usuario', 'nuevo usuario', 'agregar'] },
+    { name: 'Sistema de Alertas', route: '/dashboard/alertas', keywords: ['alertas', 'emergencias', 'seguridad'] },
     { name: 'Reportes', route: '/dashboard/reports', keywords: ['reportes', 'reports', 'estadísticas'] },
     { name: 'Configuración', route: '/dashboard/settings', keywords: ['configuración', 'settings', 'ajustes'] }
   ];
@@ -44,6 +47,11 @@ export default function Header({ onMenuClick }) {
       setShowSearchResults(false);
       setSearchTerm('');
     }
+  };
+
+  const handleLogout = () => {
+    setShowUserMenu(false);
+    logout();
   };
 
   return (
@@ -124,22 +132,66 @@ export default function Header({ onMenuClick }) {
                 onClick={() => setShowUserMenu(!showUserMenu)}
               >
                 <UserCircleIcon className="h-8 w-8 text-gray-400" />
+                {user && (
+                  <span className="ml-2 text-sm font-medium text-gray-700 hidden md:block">
+                    {user.nombre} {user.apellido}
+                  </span>
+                )}
               </button>
             </div>
 
             {/* Dropdown menu */}
             {showUserMenu && (
-              <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 z-50">
-                <a href="#" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                  Tu Perfil
-                </a>
-                <a href="#" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                  Configuración
-                </a>
-                <a href="#" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                  Cerrar Sesión
-                </a>
-              </div>
+              <>
+                {/* Overlay para cerrar el menú */}
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setShowUserMenu(false)}
+                />
+                
+                {/* Menú desplegable */}
+                <div className="origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 z-50">
+                  {/* Información del usuario */}
+                  {user && (
+                    <div className="px-4 py-3 border-b border-gray-200">
+                      <p className="text-sm font-medium text-gray-900">
+                        {user.nombre} {user.apellido}
+                      </p>
+                      <p className="text-xs text-gray-500 truncate">
+                        {user.email}
+                      </p>
+                      <p className="text-xs font-semibold text-blue-600 mt-1">
+                        {user.role}
+                      </p>
+                      {user.sector && (
+                        <p className="text-xs text-gray-500">
+                          Sector: {user.sector}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Opciones del menú */}
+                  <button
+                    onClick={() => {
+                      setShowUserMenu(false);
+                      router.push('/dashboard/profile');
+                    }}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                  >
+                    <UserCircleIcon className="h-5 w-5 mr-2 text-gray-400" />
+                    Tu Perfil
+                  </button>
+
+                  <button
+                    onClick={handleLogout}
+                    className="w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50 flex items-center border-t border-gray-100"
+                  >
+                    <ArrowRightOnRectangleIcon className="h-5 w-5 mr-2 text-red-500" />
+                    Cerrar Sesión
+                  </button>
+                </div>
+              </>
             )}
           </div>
         </div>

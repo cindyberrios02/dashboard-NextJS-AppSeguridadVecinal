@@ -53,6 +53,14 @@ export default function UsersManagement() {
       setRecentLoading(true);
       setRecentError(null);
 
+      const token = localStorage.getItem('token');
+
+      if (!token) {
+        setRecentError('No hay sesión activa');
+        setRecentLoading(false);
+        return;
+      }
+
       const params = new URLSearchParams({
         page: recentCurrentPage,
         size: recentPageSize,
@@ -61,16 +69,24 @@ export default function UsersManagement() {
       });
 
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/users?${params}`,
+        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/users/recent?${params}`,
         {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
+            'Authorization': `Bearer ${token}`,
           },
           mode: 'cors',
         }
       );
+
+      // ✅ MANEJAR TOKEN EXPIRADO
+      if (response.status === 403 || response.status === 401) {
+        localStorage.clear();
+        window.location.href = '/login';
+        return;
+      }
 
       if (!response.ok) {
         throw new Error(`Error HTTP: ${response.status}`);
@@ -102,6 +118,14 @@ export default function UsersManagement() {
     setHasSearched(true);
 
     try {
+      const token = localStorage.getItem('token');
+
+      if (!token) {
+        setSearchError('No hay sesión activa');
+        setSearchLoading(false);
+        return;
+      }
+
       const params = new URLSearchParams({
         query: searchQuery.trim(),
         page: page,
@@ -116,12 +140,21 @@ export default function UsersManagement() {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${token}`,
           },
           mode: 'cors',
         }
       );
 
       console.log('Response status:', response.status);
+
+      // ✅ MANEJAR TOKEN EXPIRADO
+      if (response.status === 403 || response.status === 401) {
+        localStorage.clear();
+        window.location.href = '/login';
+        return;
+      }
 
       const responseText = await response.text();
       console.log('Response text:', responseText);
@@ -185,19 +218,32 @@ export default function UsersManagement() {
 
   const handleVerificationToggle = async (userId, isFromSearch = false) => {
     try {
+      const token = localStorage.getItem('token');
+
+      if (!token) {
+        alert('No hay sesión activa');
+        return;
+      }
+
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/admin/users/${userId}/verification`,
         {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
           },
           mode: 'cors',
         }
       );
 
+      if (response.status === 403 || response.status === 401) {
+        localStorage.clear();
+        window.location.href = '/login';
+        return;
+      }
+
       if (response.ok) {
-        // Refresh both lists
         fetchRecentUsers();
         if (isFromSearch && hasSearched && searchQuery) {
           handleSearch(null, searchCurrentPage);
@@ -210,20 +256,33 @@ export default function UsersManagement() {
 
   const handleRoleChange = async (userId, newRole, isFromSearch = false) => {
     try {
+      const token = localStorage.getItem('token');
+
+      if (!token) {
+        alert('No hay sesión activa');
+        return;
+      }
+
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/admin/users/${userId}/role`,
         {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
           },
           mode: 'cors',
           body: JSON.stringify({ role: newRole })
         }
       );
 
+      if (response.status === 403 || response.status === 401) {
+        localStorage.clear();
+        window.location.href = '/login';
+        return;
+      }
+
       if (response.ok) {
-        // Refresh both lists
         fetchRecentUsers();
         if (isFromSearch && hasSearched && searchQuery) {
           handleSearch(null, searchCurrentPage);
@@ -236,19 +295,32 @@ export default function UsersManagement() {
 
   const handleStatusToggle = async (userId, isFromSearch = false) => {
     try {
+      const token = localStorage.getItem('token');
+
+      if (!token) {
+        alert('No hay sesión activa');
+        return;
+      }
+
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/admin/users/${userId}/status`,
         {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
           },
           mode: 'cors',
         }
       );
 
+      if (response.status === 403 || response.status === 401) {
+        localStorage.clear();
+        window.location.href = '/login';
+        return;
+      }
+
       if (response.ok) {
-        // Refresh both lists
         fetchRecentUsers();
         if (isFromSearch && hasSearched && searchQuery) {
           handleSearch(null, searchCurrentPage);
