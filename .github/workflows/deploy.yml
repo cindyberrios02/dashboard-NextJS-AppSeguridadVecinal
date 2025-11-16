@@ -30,20 +30,24 @@ jobs:
     - name: Setup SSH key
       run: |
         mkdir -p ~/.ssh
-        echo "${{ secrets.SERVER_SSH_KEY }}" > ~/.ssh/id_ed25519
-        chmod 600 ~/.ssh/id_ed25519
+        # write key without Windows CRLFs and secure permissions
+        echo "${{ secrets.SSH_PRIVATE_KEY }}" | tr -d '\r' > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        # add host to known_hosts to avoid interactive prompt
+        ssh-keyscan -H ${{ secrets.SERVER_IP }} >> ~/.ssh/known_hosts
 
     - name: Deploy to server
       run: |
-        ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
-          mkdir -p ~/seguridad_vecinal
-        EOF
+        # ensure remote dir exists
+        ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} 'mkdir -p ~/seguridad_vecinal'
 
-        rsync -avz --delete .next/ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:~/seguridad_vecinal/.next/
-        rsync -avz --delete public/ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:~/seguridad_vecinal/public/
-        rsync -avz package.json ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:~/seguridad_vecinal/
+        # sync build and public assets using the specified identity file
+        rsync -avz --delete -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" .next/ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:~/seguridad_vecinal/.next/
+        rsync -avz --delete -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" public/ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:~/seguridad_vecinal/public/
+        rsync -avz -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" package.json ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:~/seguridad_vecinal/
 
-        ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
+        # run remote install and pm2 restart/start
+        ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
           cd ~/seguridad_vecinal
           npm install --omit=dev
           pm2 restart seguridad_vecinal || pm2 start npm --name seguridad_vecinal -- start
