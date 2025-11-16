@@ -19,13 +19,17 @@ jobs:
         node-version: 18
 
     - name: Install dependencies (CI)
-      run: npm ci --omit=dev
+      run: npm ci
 
     - name: Build Next.js with environment vars
       env:
         PORT: 3001
         NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
       run: npm run build
+
+    - name: Prune devDependencies (prepare node_modules for server)
+      # remove devDependencies so node_modules only contains production deps to rsync
+      run: npm prune --production || true
 
     - name: Setup SSH key
       run: |
@@ -71,7 +75,7 @@ jobs:
         rsync -avz -e "ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o PreferredAuthentications=publickey -o StrictHostKeyChecking=yes" --delete public/ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:~/seguridad_vecinal/public/
         rsync -avz -e "ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o PreferredAuthentications=publickey -o StrictHostKeyChecking=yes" package.json ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:~/seguridad_vecinal/
 
-        # Sync node_modules from CI runner to server (we used npm ci --omit=dev above)
+        # Sync node_modules from CI runner to server (we used npm ci above and pruned devDependencies)
         rsync -avz -e "ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o PreferredAuthentications=publickey -o StrictHostKeyChecking=yes" --delete node_modules/ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:~/seguridad_vecinal/node_modules/
 
         # On remote: ensure pm2 present, start/restart app with updated env, persist process list and show logs
