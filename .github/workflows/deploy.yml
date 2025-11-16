@@ -23,7 +23,7 @@ jobs:
 
     - name: Build Next.js with environment vars
       env:
-      PORT: 3001
+        PORT: 3001
         NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
       run: npm run build
 
