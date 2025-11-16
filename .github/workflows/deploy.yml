@@ -18,8 +18,8 @@ jobs:
       with:
         node-version: 18
 
-    - name: Install dependencies
-      run: npm install
+    - name: Install dependencies (CI)
+      run: npm ci --omit=dev
 
     - name: Build Next.js with environment vars
       env:
@@ -63,14 +63,45 @@ jobs:
 
     - name: Deploy to server
       run: |
+        # Ensure target dir exists
         ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o PreferredAuthentications=publickey -o StrictHostKeyChecking=yes ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} 'mkdir -p ~/seguridad_vecinal'
 
+        # Sync build artifacts and package.json
         rsync -avz -e "ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o PreferredAuthentications=publickey -o StrictHostKeyChecking=yes" --delete .next/ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:~/seguridad_vecinal/.next/
         rsync -avz -e "ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o PreferredAuthentications=publickey -o StrictHostKeyChecking=yes" --delete public/ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:~/seguridad_vecinal/public/
         rsync -avz -e "ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o PreferredAuthentications=publickey -o StrictHostKeyChecking=yes" package.json ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:~/seguridad_vecinal/
 
+        # Sync node_modules from CI runner to server (we used npm ci --omit=dev above)
+        rsync -avz -e "ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o PreferredAuthentications=publickey -o StrictHostKeyChecking=yes" --delete node_modules/ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:~/seguridad_vecinal/node_modules/
+
+        # On remote: ensure pm2 present, start/restart app with updated env, persist process list and show logs
         ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o PreferredAuthentications=publickey -o StrictHostKeyChecking=yes ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
+          set -e
           cd ~/seguridad_vecinal
-          npm install --omit=dev
-          pm2 restart seguridad_vecinal || pm2 start npm --name seguridad_vecinal -- start
+
+          echo "=== Remote Node/npm/pm2 versions ==="
+          node -v || true
+          npm -v || true
+
+          if ! command -v pm2 >/dev/null 2>&1; then
+            echo "pm2 not found, attempting global install (may fail if server is low on memory)..."
+            npm install -g pm2 --no-audit --no-fund || true
+          fi
+          pm2 -v || true
+
+          echo "=== Start/restart app with pm2 (using --update-env) ==="
+          # Try to restart with updated env; if not found, start it
+          pm2 restart seguridad_vecinal --update-env || pm2 start npm --name seguridad_vecinal -- start
+
+          # Persist pm2 list and attempt to register startup (may require sudo on some distros)
+          pm2 save || true
+          pm2 startup -u $USER --hp /home/$USER || true
+
+          echo "=== pm2 status and description ==="
+          pm2 status || true
+          pm2 describe seguridad_vecinal || true
+
+          echo "=== Recent logs for seguridad_vecinal (diagnostics) ==="
+          # Non-interactive recent logs; --nostream prevents continuous streaming
+          pm2 logs seguridad_vecinal --lines 200 --nostream --timestamp || true
         EOF
