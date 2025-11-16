@@ -54,17 +54,22 @@ jobs:
 
     - name: Test SSH connectivity
       run: |
-        ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=yes -o BatchMode=yes ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} 'echo "SSH OK"'
+        # Show verbose SSH output to help diagnose "Permission denied (publickey)"
+        echo "Derived public key (copy this to server's ~/.ssh/authorized_keys if missing):"
+        cat ~/.ssh/id_ed25519.pub || true
+
+        # Use IdentitiesOnly and prefer publickey to ensure the provided key is used
+        ssh -vvv -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o PreferredAuthentications=publickey -o StrictHostKeyChecking=yes -o BatchMode=yes ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} 'echo "SSH OK"'
 
     - name: Deploy to server
       run: |
-        ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=yes ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} 'mkdir -p ~/seguridad_vecinal'
+        ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o PreferredAuthentications=publickey -o StrictHostKeyChecking=yes ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} 'mkdir -p ~/seguridad_vecinal'
 
-        rsync -avz -e "ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=yes" --delete .next/ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:~/seguridad_vecinal/.next/
-        rsync -avz -e "ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=yes" --delete public/ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:~/seguridad_vecinal/public/
-        rsync -avz -e "ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=yes" package.json ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:~/seguridad_vecinal/
+        rsync -avz -e "ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o PreferredAuthentications=publickey -o StrictHostKeyChecking=yes" --delete .next/ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:~/seguridad_vecinal/.next/
+        rsync -avz -e "ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o PreferredAuthentications=publickey -o StrictHostKeyChecking=yes" --delete public/ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:~/seguridad_vecinal/public/
+        rsync -avz -e "ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o PreferredAuthentications=publickey -o StrictHostKeyChecking=yes" package.json ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:~/seguridad_vecinal/
 
-        ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=yes ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
+        ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o PreferredAuthentications=publickey -o StrictHostKeyChecking=yes ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
           cd ~/seguridad_vecinal
           npm install --omit=dev
           pm2 restart seguridad_vecinal || pm2 start npm --name seguridad_vecinal -- start
