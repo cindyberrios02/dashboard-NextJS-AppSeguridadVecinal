@@ -30,11 +30,21 @@ jobs:
     - name: Setup SSH key
       run: |
         mkdir -p ~/.ssh
-        # Preserve newlines reliably
-        printf '%s\n' "${{ secrets.SERVER_SSH_KEY }}" > ~/.ssh/id_ed25519
+
+        # Write private key, strip CRLFs (handles secrets pasted from Windows)
+        printf '%s\n' "${{ secrets.SERVER_SSH_KEY }}" | sed 's/\r$//' > ~/.ssh/id_ed25519
         chmod 600 ~/.ssh/id_ed25519
 
-        # Add server to known_hosts to avoid host key prompts (use your SERVER_IP or DNS)
+        # Try to derive the public key from the private key and print fingerprint for debugging
+        if ssh-keygen -y -f ~/.ssh/id_ed25519 > ~/.ssh/id_ed25519.pub 2>/dev/null; then
+          echo "Derived public key written to ~/.ssh/id_ed25519.pub"
+          echo "Public key fingerprint (compare this with server's authorized_keys):"
+          ssh-keygen -lf ~/.ssh/id_ed25519.pub || true
+        else
+          echo "Could not derive public key from private key. Ensure the secret contains a valid OpenSSH/ED25519 private key."
+        fi
+
+        # Add server to known_hosts to avoid host key prompts
         ssh-keyscan -H ${{ secrets.SERVER_IP }} >> ~/.ssh/known_hosts
         chmod 644 ~/.ssh/known_hosts
 
