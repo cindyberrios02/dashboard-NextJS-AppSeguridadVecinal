@@ -2,6 +2,7 @@
 import Layout from "../../../components/layout/Layout";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
+import { fetchWithAuth } from '../../../../lib/fetch-with-auth';
 import { 
   UserIcon,
   ArrowLeftIcon,
@@ -30,101 +31,76 @@ export default function UserDetail() {
   }, [id]);
 
   const fetchUser = async () => {
-    try {
-      setLoading(true);
-      setError(null);
+  try {
+    setLoading(true);
+    setError(null);
 
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/users/${id}`,
-        {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          mode: 'cors',
-        }
-      );
+    const response = await fetchWithAuth(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/admin/users/${id}`
+    );
 
-      const data = await response.json();
+    const data = await response.json();
 
-      if (response.ok) {
-        setUser(data.user);
-      } else {
-        setError(data.message || 'Usuario no encontrado');
-      }
-      
-    } catch (error) {
-      console.error('Error fetching user:', error);
-      setError('Error de conexión al obtener usuario');
-    } finally {
-      setLoading(false);
+    if (response.ok) {
+      setUser(data.user);
+    } else {
+      setError(data.message || 'Usuario no encontrado');
     }
-  };
+    
+  } catch (error) {
+    console.error('Error fetching user:', error);
+    setError('Error de conexión al obtener usuario');
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleVerificationToggle = async () => {
+  try {
+    const response = await fetchWithAuth(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/admin/users/${id}/verification`,
+      { method: 'PUT' }
+    );
+
+    if (response.ok) {
+      fetchUser();
+    }
+  } catch (error) {
+    console.error('Error toggling verification:', error);
+  }
+};
+
+ const handleStatusToggle = async () => {
+  try {
+    const response = await fetchWithAuth(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/admin/users/${id}/status`,
+      { method: 'PUT' }
+    );
+
+    if (response.ok) {
+      fetchUser();
+    }
+  } catch (error) {
+    console.error('Error toggling status:', error);
+  }
+};
+
+ const handleDelete = async () => {
+  if (window.confirm('¿Estás seguro de que quieres eliminar este usuario? Esta acción no se puede deshacer.')) {
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/users/${id}/verification`,
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          mode: 'cors',
-        }
+      const response = await fetchWithAuth(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/users/${id}`,
+        { method: 'DELETE' }
       );
 
       if (response.ok) {
-        fetchUser(); // Recargar datos
+        router.push('/dashboard/users?success=Usuario eliminado exitosamente');
       }
     } catch (error) {
-      console.error('Error toggling verification:', error);
+      console.error('Error deleting user:', error);
     }
-  };
-
-  const handleStatusToggle = async () => {
-    try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/users/${id}/status`,
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          mode: 'cors',
-        }
-      );
-
-      if (response.ok) {
-        fetchUser(); // Recargar datos
-      }
-    } catch (error) {
-      console.error('Error toggling status:', error);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (window.confirm('¿Estás seguro de que quieres eliminar este usuario? Esta acción no se puede deshacer.')) {
-      try {
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/admin/users/${id}`,
-          {
-            method: 'DELETE',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            mode: 'cors',
-          }
-        );
-
-        if (response.ok) {
-          router.push('/dashboard/users?success=Usuario eliminado exitosamente');
-        }
-      } catch (error) {
-        console.error('Error deleting user:', error);
-      }
-    }
-  };
+  }
+};
 
   const formatDate = (dateString) => {
     try {

@@ -1,6 +1,8 @@
 // src/pages/dashboard/users/index.js
 import Layout from "../../../components/layout/Layout";
 import { useState, useEffect } from "react";
+import { fetchWithAuth } from '../../../../lib/fetch-with-auth';
+import { authStorage } from '../../../../lib/auth-storage';
 import { useRouter } from "next/router";
 import {
   MagnifyingGlassIcon,
@@ -49,153 +51,101 @@ export default function UsersManagement() {
   }, [recentCurrentPage]);
 
   const fetchRecentUsers = async () => {
+    console.log('🔍 fetchRecentUsers - Iniciando...');
+    console.log('Token disponible:', !!authStorage.getToken());
+
     try {
       setRecentLoading(true);
       setRecentError(null);
 
-      const token = localStorage.getItem('token');
+    const params = new URLSearchParams({
+      page: recentCurrentPage,
+      size: recentPageSize,
+      sortBy: 'fechaRegistro',
+      sortDir: 'desc'
+    });
 
-      if (!token) {
-        setRecentError('No hay sesión activa');
-        setRecentLoading(false);
-        return;
-      }
+    const response = await fetchWithAuth(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/admin/users/recent?${params}`
+    );
 
-      const params = new URLSearchParams({
-        page: recentCurrentPage,
-        size: recentPageSize,
-        sortBy: 'fechaRegistro',
-        sortDir: 'desc'
-      });
-
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/users/recent?${params}`,
-        {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          mode: 'cors',
-        }
-      );
-
-      // ✅ MANEJAR TOKEN EXPIRADO
-      if (response.status === 403 || response.status === 401) {
-        localStorage.clear();
-        window.location.href = '/login';
-        return;
-      }
-
-      if (!response.ok) {
-        throw new Error(`Error HTTP: ${response.status}`);
-      }
-
-      const data = await response.json();
-      setRecentUsers(data.users || []);
-      setRecentTotalPages(data.totalPages || 0);
-      setRecentTotalElements(data.totalElements || 0);
-      
-    } catch (error) {
-      console.error('Error fetching recent users:', error);
-      setRecentError(error.message);
-    } finally {
-      setRecentLoading(false);
+    if (!response.ok) {
+      throw new Error(`Error HTTP: ${response.status}`);
     }
-  };
 
-  const handleSearch = async (e, page = 0) => {
-    if (e) e.preventDefault();
+    const data = await response.json();
+    setRecentUsers(data.users || []);
+    setRecentTotalPages(data.totalPages || 0);
+    setRecentTotalElements(data.totalElements || 0);
     
-    if (!searchQuery.trim()) {
-      setSearchError('Ingresa un término de búsqueda');
-      return;
+  } catch (error) {
+    console.error('Error fetching recent users:', error);
+    setRecentError(error.message);
+  } finally {
+    setRecentLoading(false);
+  }
+};
+
+ const handleSearch = async (e, page = 0) => {
+  if (e) e.preventDefault();
+  
+  if (!searchQuery.trim()) {
+    setSearchError('Ingresa un término de búsqueda');
+    return;
+  }
+
+  setSearchLoading(true);
+  setSearchError(null);
+  setHasSearched(true);
+
+  try {
+    const params = new URLSearchParams({
+      query: searchQuery.trim(),
+      page: page,
+      size: searchPageSize
+    });
+
+    const response = await fetchWithAuth(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/admin/users/search-global?${params}`
+    );
+
+    const responseText = await response.text();
+
+    if (!responseText) {
+      throw new Error('La respuesta del servidor está vacía');
     }
 
-    setSearchLoading(true);
-    setSearchError(null);
-    setHasSearched(true);
-
+    let data;
     try {
-      const token = localStorage.getItem('token');
-
-      if (!token) {
-        setSearchError('No hay sesión activa');
-        setSearchLoading(false);
-        return;
-      }
-
-      const params = new URLSearchParams({
-        query: searchQuery.trim(),
-        page: page,
-        size: searchPageSize
-      });
-
-      console.log('Enviando request a:', `${process.env.NEXT_PUBLIC_API_URL}/api/admin/users/search-global?${params}`);
-
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/users/search-global?${params}`,
-        {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          mode: 'cors',
-        }
-      );
-
-      console.log('Response status:', response.status);
-
-      // ✅ MANEJAR TOKEN EXPIRADO
-      if (response.status === 403 || response.status === 401) {
-        localStorage.clear();
-        window.location.href = '/login';
-        return;
-      }
-
-      const responseText = await response.text();
-      console.log('Response text:', responseText);
-
-      if (!responseText) {
-        throw new Error('La respuesta del servidor está vacía');
-      }
-
-      let data;
-      try {
-        data = JSON.parse(responseText);
-      } catch (jsonError) {
-        console.error('Error parsing JSON:', jsonError);
-        throw new Error(`Respuesta del servidor no es JSON válido: ${responseText.substring(0, 100)}`);
-      }
-
-      if (response.ok) {
-        if (data.status === 'success') {
-          setSearchResults(data.users || []);
-          setSearchTotalPages(data.totalPages || 0);
-          setSearchTotalElements(data.totalElements || 0);
-          setSearchCurrentPage(data.currentPage || 0);
-          setSearchTips(data.searchTips || []);
-          setSearchError(null);
-        } else {
-          setSearchResults([]);
-          setSearchError('No se encontraron usuarios');
-        }
-      } else {
-        console.error('Server error response:', data);
-        setSearchError(data.message || `Error del servidor: ${response.status}`);
-      }
-
-    } catch (error) {
-      console.error('Error searching users:', error);
-      setSearchError(`Error de conexión: ${error.message}`);
-      setSearchResults([]);
-    } finally {
-      setSearchLoading(false);
+      data = JSON.parse(responseText);
+    } catch (jsonError) {
+      throw new Error(`Respuesta del servidor no es JSON válido`);
     }
-  };
+
+    if (response.ok) {
+      if (data.status === 'success') {
+        setSearchResults(data.users || []);
+        setSearchTotalPages(data.totalPages || 0);
+        setSearchTotalElements(data.totalElements || 0);
+        setSearchCurrentPage(data.currentPage || 0);
+        setSearchTips(data.searchTips || []);
+        setSearchError(null);
+      } else {
+        setSearchResults([]);
+        setSearchError('No se encontraron usuarios');
+      }
+    } else {
+      setSearchError(data.message || `Error del servidor: ${response.status}`);
+    }
+
+  } catch (error) {
+    console.error('Error searching users:', error);
+    setSearchError(`Error: ${error.message}`);
+    setSearchResults([]);
+  } finally {
+    setSearchLoading(false);
+  }
+};
 
   const handleSearchPageChange = (newPage) => {
     setSearchCurrentPage(newPage);
@@ -216,120 +166,62 @@ export default function UsersManagement() {
     setSearchTotalElements(0);
   };
 
-  const handleVerificationToggle = async (userId, isFromSearch = false) => {
-    try {
-      const token = localStorage.getItem('token');
+ const handleVerificationToggle = async (userId, isFromSearch = false) => {
+  try {
+    const response = await fetchWithAuth(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/admin/users/${userId}/verification`,
+      { method: 'PUT' }
+    );
 
-      if (!token) {
-        alert('No hay sesión activa');
-        return;
+    if (response.ok) {
+      fetchRecentUsers();
+      if (isFromSearch && hasSearched && searchQuery) {
+        handleSearch(null, searchCurrentPage);
       }
-
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/users/${userId}/verification`,
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          mode: 'cors',
-        }
-      );
-
-      if (response.status === 403 || response.status === 401) {
-        localStorage.clear();
-        window.location.href = '/login';
-        return;
-      }
-
-      if (response.ok) {
-        fetchRecentUsers();
-        if (isFromSearch && hasSearched && searchQuery) {
-          handleSearch(null, searchCurrentPage);
-        }
-      }
-    } catch (error) {
-      console.error('Error toggling verification:', error);
     }
-  };
+  } catch (error) {
+    console.error('Error toggling verification:', error);
+  }
+};
 
-  const handleRoleChange = async (userId, newRole, isFromSearch = false) => {
-    try {
-      const token = localStorage.getItem('token');
-
-      if (!token) {
-        alert('No hay sesión activa');
-        return;
+ const handleRoleChange = async (userId, newRole, isFromSearch = false) => {
+  try {
+    const response = await fetchWithAuth(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/admin/users/${userId}/role`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({ role: newRole })
       }
+    );
 
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/users/${userId}/role`,
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          mode: 'cors',
-          body: JSON.stringify({ role: newRole })
-        }
-      );
-
-      if (response.status === 403 || response.status === 401) {
-        localStorage.clear();
-        window.location.href = '/login';
-        return;
+    if (response.ok) {
+      fetchRecentUsers();
+      if (isFromSearch && hasSearched && searchQuery) {
+        handleSearch(null, searchCurrentPage);
       }
-
-      if (response.ok) {
-        fetchRecentUsers();
-        if (isFromSearch && hasSearched && searchQuery) {
-          handleSearch(null, searchCurrentPage);
-        }
-      }
-    } catch (error) {
-      console.error('Error changing role:', error);
     }
-  };
+  } catch (error) {
+    console.error('Error changing role:', error);
+  }
+};
 
   const handleStatusToggle = async (userId, isFromSearch = false) => {
-    try {
-      const token = localStorage.getItem('token');
+  try {
+    const response = await fetchWithAuth(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/admin/users/${userId}/status`,
+      { method: 'PUT' }
+    );
 
-      if (!token) {
-        alert('No hay sesión activa');
-        return;
+    if (response.ok) {
+      fetchRecentUsers();
+      if (isFromSearch && hasSearched && searchQuery) {
+        handleSearch(null, searchCurrentPage);
       }
-
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/users/${userId}/status`,
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          mode: 'cors',
-        }
-      );
-
-      if (response.status === 403 || response.status === 401) {
-        localStorage.clear();
-        window.location.href = '/login';
-        return;
-      }
-
-      if (response.ok) {
-        fetchRecentUsers();
-        if (isFromSearch && hasSearched && searchQuery) {
-          handleSearch(null, searchCurrentPage);
-        }
-      }
-    } catch (error) {
-      console.error('Error toggling status:', error);
     }
-  };
+  } catch (error) {
+    console.error('Error toggling status:', error);
+  }
+};
 
   const formatDate = (dateString) => {
     try {

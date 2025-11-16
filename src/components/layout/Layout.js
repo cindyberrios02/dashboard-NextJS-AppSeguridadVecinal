@@ -4,7 +4,7 @@ import Sidebar from './Sidebar';
 import Header from './Header';
 
 
-import ProtectedRoute from '../ProtectedRoute';
+import ProtectedRoute from '../auth/ProtectedRoute'; 
 
 export default function Layout({ children }) {
   return (

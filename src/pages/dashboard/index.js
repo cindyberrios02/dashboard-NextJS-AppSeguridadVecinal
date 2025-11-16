@@ -1,6 +1,7 @@
 // src/pages/dashboard/index.js
 import Layout from "../../components/layout/Layout"; 
 import StatsCard from "../../components/dashboard/StatsCard";
+import { fetchWithAuth } from '../../../lib/fetch-with-auth';
 import { ShieldCheckIcon, BellAlertIcon, UsersIcon, MapPinIcon, CurrencyDollarIcon, ArrowTrendingUpIcon, ShoppingCartIcon } from "@heroicons/react/24/outline";
 
 import React, { useState, useEffect } from "react";
@@ -30,40 +31,16 @@ const fetchDashboardData = async () => {
       throw new Error('La variable NEXT_PUBLIC_API_URL no está configurada');
     }
     
-    const token = localStorage.getItem('token');
-    
-    if (!token) {
-      throw new Error('No hay token de autenticación');
-    }
-    
-    const response = await fetch(`${apiUrl}/api/admin/dashboard/stats`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      mode: 'cors',
-    });
-    
-    console.log('Response status:', response.status);
-    
-    // ✅ SI EL TOKEN EXPIRÓ, REDIRIGIR AL LOGIN
-    if (response.status === 403 || response.status === 401) {
-      localStorage.clear();
-      window.location.href = '/login';
-      return;
-    }
+    const response = await fetchWithAuth(`${apiUrl}/api/admin/dashboard/stats`);
     
     if (!response.ok) {
-      throw new Error(`Error HTTP: ${response.status} - ${response.statusText}`);
+      throw new Error(`Error HTTP: ${response.status}`);
     }
     
     const data = await response.json();
-    console.log('Datos recibidos:', data);
     
     setStats({
-      users: data.users || 0,
+      users: data.totalUsers || 0,
       sales: data.sales || 0,
       orders: data.orders || 0,
       revenue: data.revenue || 0
@@ -73,12 +50,11 @@ const fetchDashboardData = async () => {
     console.error('Error fetching dashboard data:', error);
     setError(error.message);
     
-    // Datos de ejemplo
     setStats({
-      users: 1250,
-      sales: 45230,
-      orders: 189,
-      revenue: 95680
+      users: 0,
+      sales: 0,
+      orders: 0,
+      revenue: 0
     });
   } finally {
     setLoading(false);

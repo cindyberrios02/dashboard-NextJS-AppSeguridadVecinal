@@ -2,6 +2,7 @@
 import Layout from "../../../components/layout/Layout";
 import { useState } from "react";
 import { useRouter } from "next/router";
+import { fetchWithAuth } from '../../../../lib/fetch-with-auth';
 import { 
   UserPlusIcon,
   ArrowLeftIcon,
@@ -35,48 +36,67 @@ export default function NewUser() {
     }));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
+ const handleSubmit = async (e) => {
+  e.preventDefault();
+  setLoading(true);
+  setError(null);
 
-    try {
-      // Convertir coordenadas a números si existen
-      const submitData = {
-        ...formData,
-        latitud: formData.latitud ? parseFloat(formData.latitud) : null,
-        longitud: formData.longitud ? parseFloat(formData.longitud) : null
-      };
+  try {
+    // Convertir coordenadas a números si existen
+    const submitData = {
+      ...formData,
+      latitud: formData.latitud ? parseFloat(formData.latitud) : null,
+      longitud: formData.longitud ? parseFloat(formData.longitud) : null
+    };
 
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/users`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          mode: 'cors',
-          body: JSON.stringify(submitData)
-        }
-      );
+    console.log('📤 Enviando datos:', submitData);
 
+    const response = await fetchWithAuth(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/admin/users`,
+      {
+        method: 'POST',
+        body: JSON.stringify(submitData)
+      }
+    );
+
+    console.log('📡 Response status:', response.status);
+
+    // Si la respuesta es exitosa pero está vacía
+    if (response.status === 201 || response.status === 200) {
+      console.log('✅ Usuario creado exitosamente');
+      router.push('/dashboard/users?success=Usuario creado exitosamente');
+      return;
+    }
+
+    // Intentar parsear JSON solo si hay contenido
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
       const data = await response.json();
-
+      
       if (response.ok) {
-        // Redirigir a la lista de usuarios con mensaje de éxito
+        console.log('✅ Usuario creado:', data);
         router.push('/dashboard/users?success=Usuario creado exitosamente');
       } else {
         setError(data.message || 'Error al crear usuario');
       }
-      
-    } catch (error) {
-      console.error('Error creating user:', error);
-      setError('Error de conexión al crear usuario');
-    } finally {
-      setLoading(false);
+    } else {
+      // Si no hay JSON, pero la respuesta fue exitosa
+      if (response.ok) {
+        router.push('/dashboard/users?success=Usuario creado exitosamente');
+      } else {
+        const text = await response.text();
+        console.error('Error response:', text);
+        setError('Error al crear usuario');
+      }
     }
-  };
-
+    
+  } catch (error) {
+    console.error('❌ Error creating user:', error);
+    setError('Error de conexión: ' + error.message);
+  } finally {
+    setLoading(false);
+  }
+};
   return (
     <Layout>
       <div className="space-y-6">
