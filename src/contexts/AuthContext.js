@@ -1,113 +1,110 @@
-// src/contexts/AuthContext.js
+// contexts/AuthContext.js
 import { createContext, useContext, useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { authStorage } from '../../lib/auth-storage';
+import { authService } from '@/lib/api/auth';
 
 const AuthContext = createContext({});
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
+  // Inicializar usuario desde localStorage
   useEffect(() => {
-    loadUserFromStorage();
-  }, []);
-
-  const loadUserFromStorage = () => {
-    try {
-      const token = authStorage.getToken();
-      const userData = authStorage.getUser();
-      
-      console.log('🔄 Cargando sesión:', {
-        hasToken: !!token,
-        hasUser: !!userData
-      });
-      
-      if (token && userData) {
-        const parsedUser = JSON.parse(userData);
-        setUser(parsedUser);
-        console.log('✅ Usuario cargado:', parsedUser.email);
+    const initAuth = async () => {
+      try {
+        const currentUser = authService.getCurrentUser();
+        
+        if (currentUser) {
+          // Intentar refresh del token al cargar
+          const refreshResult = await authService.refreshToken();
+          
+          if (refreshResult.success) {
+            setUser(currentUser);
+          } else {
+            // Si falla el refresh, limpiar todo
+            await authService.logout();
+            setUser(null);
+          }
+        }
+      } catch (error) {
+        console.error('Auth initialization error:', error);
+        setUser(null);
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error('❌ Error cargando sesión:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
+
+    initAuth();
+  }, []);
 
   const login = async (email, password) => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8082';
+      const result = await authService.login(email, password);
       
-      const response = await fetch(
-        `${apiUrl}/api/auth/authenticate`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          mode: 'cors',
-          body: JSON.stringify({ email, password }),
+      if (result.success) {
+        setUser(result.user);
+        
+        // Verificar si puede acceder al dashboard
+        if (authService.canAccessDashboard(result.user.role)) {
+          router.push('/dashboard');
+        } else {
+          // Si es VECINO, no puede acceder al dashboard web
+          await authService.logout();
+          return {
+            success: false,
+            error: 'Los usuarios VECINO no tienen acceso al dashboard web. Por favor, usa la aplicación móvil.',
+          };
         }
-      );
-
-      if (!response.ok) {
-        throw new Error('Credenciales erróneas');
+        
+        return { success: true };
       }
-
-      const data = await response.json();
-
-      const userData = {
-        userId: data.userId,
-        nombre: data.nombre,
-        apellido: data.apellido,
-        email: data.username,
-        role: data.role,
-        isAdmin: data.isAdmin,
-        sector: data.sector,
-        villaId: data.villaId,
-        villaNombre: data.villaNombre,
-      };
       
-      authStorage.setToken(data.accessToken);
-      authStorage.setRefreshToken(data.refreshToken);
-      authStorage.setUser(userData);
-      
-      setUser(userData);
-
-      return { success: true };
+      return result;
     } catch (error) {
-      return { success: false, error: error.message };
+      console.error('Login error in context:', error);
+      return {
+        success: false,
+        error: 'Error inesperado al iniciar sesión',
+      };
     }
   };
 
-  const logout = () => {
-    authStorage.clear();
-    setUser(null);
-    router.push('/login');
+  const logout = async () => {
+    try {
+      await authService.logout();
+      setUser(null);
+      router.push('/login');
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Limpiar de todos modos
+      setUser(null);
+      router.push('/login');
+    }
   };
 
-  const isAuthenticated = () => {
-    return !!authStorage.getToken();
-  };
-
-  const canAccessDashboard = () => {
-    return !!authStorage.getToken();
+  const value = {
+    user,
+    loading,
+    login,
+    logout,
+    isAuthenticated: !!user,
+    isAdmin: user?.isAdmin || false,
+    canAccessDashboard: user ? authService.canAccessDashboard(user.role) : false,
   };
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      login, 
-      logout, 
-      loading, 
-      isAuthenticated,
-      canAccessDashboard
-    }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
 };
-
-export const useAuth = () => useContext(AuthContext);

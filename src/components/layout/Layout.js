@@ -12,11 +12,12 @@ export default function Layout({ children }) {
       <div className="min-h-screen bg-gray-100">
         <Header />
         <Sidebar />
-        <main className="ml-64 pt-16">
-          <div className="p-8">
+        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+          <div className="p-4 md:p-6">
             {children}
           </div>
         </main>
+
       </div>
     </ProtectedRoute>
   );

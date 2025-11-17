@@ -19,6 +19,7 @@
     "recharts": "^3.4.1"
   },
   "devDependencies": {
+    "@tanstack/react-query-devtools": "^5.90.2",
     "@types/js-cookie": "^3.0.6",
     "@types/node": "^20.0.0",
     "@types/react": "^18.2.0",

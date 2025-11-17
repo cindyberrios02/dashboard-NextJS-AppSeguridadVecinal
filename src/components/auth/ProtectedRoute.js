@@ -1,59 +1,41 @@
 // src/components/auth/ProtectedRoute.js
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { authStorage } from '../../../lib/auth-storage';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function ProtectedRoute({ children }) {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isChecking, setIsChecking] = useState(true);
   const router = useRouter();
+  const { isAuthenticated, loading, canAccessDashboard } = useAuth();
 
   useEffect(() => {
-    checkAuth();
-  }, [router.pathname]);
-
-  const checkAuth = () => {
-    console.log('🔍 ProtectedRoute (auth/) - INICIANDO checkAuth');
-    
-    const token = authStorage.getToken();
-    const user = authStorage.getUser();
-    
-    console.log('🔍 ProtectedRoute (auth/) - RESULTADOS:', {
-      token: token ? 'PRESENTE' : 'AUSENTE',
-      user: user ? 'PRESENTE' : 'AUSENTE',
-      hasToken: !!token,
-      hasUser: !!user
-    });
-
-    if (!token || !user) {
-      console.log('❌ No autenticado - Redirigiendo');
-      setIsAuthenticated(false);
-      setIsChecking(false);
-      
-      if (router.pathname !== '/login') {
+    if (!loading) {
+      if (!isAuthenticated) {
+        console.log('❌ No autenticado, redirigiendo a login');
+        router.push('/login');
+      } else if (!canAccessDashboard) {
+        console.log('❌ Sin permisos para dashboard, redirigiendo a login');
         router.push('/login');
       }
-    } else {
-      console.log('✅ Autenticado - Acceso permitido');
-      setIsAuthenticated(true);
-      setIsChecking(false);
     }
-  };
+  }, [isAuthenticated, loading, canAccessDashboard, router]);
 
-  if (isChecking) {
+  // Mostrar loading mientras verifica autenticación
+  if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Verificando sesión...</p>
+          <p className="text-gray-600">Verificando autenticación...</p>
         </div>
       </div>
     );
   }
 
-  if (!isAuthenticated) {
+  // Si no está autenticado o no tiene permisos, no mostrar nada (está redirigiendo)
+  if (!isAuthenticated || !canAccessDashboard) {
     return null;
   }
 
-  return <>{children}</>;
+  // Usuario autenticado y con permisos
+  return children;
 }
