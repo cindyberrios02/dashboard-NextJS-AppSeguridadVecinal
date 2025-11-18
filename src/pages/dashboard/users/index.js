@@ -109,7 +109,7 @@ export default function UsersIndex() {
             <p className="mt-1 text-sm text-gray-600">
               {isSuperAdmin() 
                 ? 'Administra todos los usuarios del sistema' 
-                : `Administra usuarios de ${currentUser.villaNombre}`
+                : `Administra usuarios de ${currentUser?.villaNombre || 'tu villa'}`
               }
             </p>
           </div>

@@ -1,9 +1,10 @@
 // src/pages/dashboard/alertas/index.js
 import { useState, useEffect } from 'react';
-import Layout from '../../../components/layout/Layout';
-import AlertaCard from '../../../components/alertas/AlertaCard';
-import { alertasAPI } from '../../../../lib/api';
+import Layout from '@/components/layout/Layout';
+import AlertaCard from '@/components/alertas/AlertaCard';
+import { alertasAPI } from '@/lib/api'; 
 import { useRouter } from 'next/router';
+
 
 export default function AlertasPage() {
   const router = useRouter();
