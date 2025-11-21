@@ -1,94 +1,108 @@
-// src/components/layout/Sidebar.js
 import Link from 'next/link';
-import { ChartBarIcon } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/router';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   HomeIcon,
   UsersIcon,
-  ChartBarIcon,
+  MapIcon,
   CogIcon,
-  BellIcon,      // ✅ Agregar
-  MapIcon,       // ✅ Agregar si no está
+  BellIcon,
+  ChartBarIcon,
 } from '@heroicons/react/24/outline';
 
-const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
-  { name: 'Usuarios', href: '/dashboard/users', icon: UsersIcon },
-  { name: 'Alertas', href: '/dashboard/alertas', icon: BellIcon },
-  { name: 'Analytics Alertas', href: '/dashboard/alertas/analytics', icon: ChartBarIcon }, // ✅ NUEVO
-  { name: 'Geografía', href: '/dashboard/geografia', icon: MapIcon },
-  { name: 'Configuración', href: '/dashboard/settings', icon: CogIcon },
-];
-
-export default function Sidebar({ isOpen, onClose }) {
+export default function Sidebar() {
   const router = useRouter();
+  const { user, logout } = useAuth();
+
+  const navigation = [
+    { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
+    { name: 'Usuarios', href: '/dashboard/users', icon: UsersIcon },
+    { name: 'Alertas', href: '/dashboard/alertas', icon: BellIcon }, // ✅ NUEVO
+    { name: 'Analytics Alertas', href: '/dashboard/alertas/analytics', icon: ChartBarIcon }, // ✅ NUEVO
+    { name: 'Geografía', href: '/dashboard/geografia', icon: MapIcon },
+    { name: 'Configuración', href: '/dashboard/settings', icon: CogIcon },
+  ];
+
+  const isActive = (path) => {
+    return router.pathname === path;
+  };
 
   return (
-    <>
-      {/* Mobile overlay */}
-      {isOpen && (
-        <div className="fixed inset-0 flex z-40 md:hidden">
-          <div className="fixed inset-0 bg-gray-600 bg-opacity-75" onClick={onClose} />
-          <div className="relative flex-1 flex flex-col max-w-xs w-full bg-white">
-            <div className="absolute top-0 right-0 -mr-12 pt-2">
-              <button
-                className="ml-1 flex items-center justify-center h-10 w-10 rounded-full focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white"
-                onClick={onClose}
-              >
-                <XMarkIcon className="h-6 w-6 text-white" />
-              </button>
-            </div>
-            <SidebarContent currentPath={router.pathname} />
+    <div className="flex flex-col h-full bg-white border-r border-gray-200">
+      {/* Logo/Brand */}
+      <div className="flex items-center justify-center h-16 border-b border-gray-200">
+        <div className="flex items-center space-x-2">
+          <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
+            <svg
+              className="w-5 h-5 text-white"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+              />
+            </svg>
           </div>
+          <span className="text-xl font-bold text-gray-900">Seguridad</span>
         </div>
-      )}
-
-      {/* Desktop sidebar */}
-      <div className="hidden md:flex md:flex-shrink-0">
-        <div className="flex flex-col w-64">
-          <div className="flex flex-col h-0 flex-1 bg-white shadow">
-            <SidebarContent currentPath={router.pathname} />
-          </div>
-        </div>
-      </div>
-    </>
-  );
-}
-
-function SidebarContent({ currentPath }) {
-  return (
-    <>
-      {/* Logo */}
-      <div className="flex items-center h-16 flex-shrink-0 px-4 bg-blue-600">
-        <h1 className="text-white text-xl font-bold">Admin Panel</h1>
       </div>
 
       {/* Navigation */}
-      <div className="flex-1 flex flex-col overflow-y-auto">
-        <nav className="flex-1 px-2 py-4 space-y-1">
-          {navigation.map((item) => {
-            const isActive = currentPath === item.href;
-            return (
-              <Link
-                key={item.name}
-                href={item.href}
-                className={`${
-                  isActive
-                    ? 'bg-blue-100 text-blue-700'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                } group flex items-center px-2 py-2 text-sm font-medium rounded-md`}
-              >
-                <item.icon
-                  className={`${
-                    isActive ? 'text-blue-500' : 'text-gray-400 group-hover:text-gray-500'
-                  } mr-3 h-6 w-6`}
-                />
-                {item.name}
-              </Link>
-            );
-          })}
-        </nav>
+      <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
+        {navigation.map((item) => {
+          const Icon = item.icon;
+          const active = isActive(item.href);
+          
+          return (
+            <Link
+              key={item.name}
+              href={item.href}
+              className={`
+                flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors
+                ${
+                  active
+                    ? 'bg-indigo-50 text-indigo-600'
+                    : 'text-gray-700 hover:bg-gray-100'
+                }
+              `}
+            >
+              <Icon className="w-5 h-5 mr-3" />
+              {item.name}
+            </Link>
+          );
+        })}
+      </nav>
+
+      {/* User Info */}
+      <div className="border-t border-gray-200 p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
+              <span className="text-sm font-medium text-gray-700">
+                {user?.nombre?.charAt(0)?.toUpperCase() || 'N'}
+              </span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-900 truncate">
+                {user?.nombre || 'Usuario'}
+              </p>
+              <p className="text-xs text-gray-500 truncate">
+                {user?.role || 'VECINO'}
+              </p>
+            </div>
+          </div>
+        </div>
+        <button
+          onClick={logout}
+          className="w-full px-4 py-2 text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
+        >
+          Cerrar Sesión
+        </button>
       </div>
-    </>
+    </div>
   );
 }
