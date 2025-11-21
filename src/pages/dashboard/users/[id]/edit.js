@@ -227,7 +227,7 @@ export default function EditUser() {
                     name="nombre"
                     id="nombre"
                     required
-                    value={formData.nombre}
+                    value={formData?.nombre}
                     onChange={handleChange}
                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm px-3 py-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                   />
@@ -242,7 +242,7 @@ export default function EditUser() {
                     name="apellido"
                     id="apellido"
                     required
-                    value={formData.apellido}
+                    value={formData?.apellido}
                     onChange={handleChange}
                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm px-3 py-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                   />
@@ -256,7 +256,7 @@ export default function EditUser() {
                     type="text"
                     name="rut"
                     id="rut"
-                    value={formData.rut}
+                    value={formData?.rut}
                     onChange={handleChange}
                     placeholder="12345678-9"
                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm px-3 py-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
@@ -272,7 +272,7 @@ export default function EditUser() {
                     name="email"
                     id="email"
                     required
-                    value={formData.email}
+                    value={formData?.email}
                     onChange={handleChange}
                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm px-3 py-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                   />
@@ -287,7 +287,7 @@ export default function EditUser() {
                       type={showPassword ? 'text' : 'password'}
                       name="password"
                       id="password"
-                      value={formData.password}
+                      value={formData?.password}
                       onChange={handleChange}
                       placeholder="Dejar vacío para no cambiar"
                       className="block w-full border border-gray-300 rounded-md shadow-sm px-3 py-2 pr-10 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
@@ -317,7 +317,7 @@ export default function EditUser() {
                     name="role"
                     id="role"
                     required
-                    value={formData.role}
+                    value={formData?.role}
                     onChange={handleChange}
                     disabled={!canChangeRoles()}
                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm px-3 py-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
@@ -348,14 +348,14 @@ export default function EditUser() {
                     <select
                       name="villaId"
                       id="villaId"
-                      value={formData.villaId || ''}
+                      value={formData?.villaId || ''}
                       onChange={handleChange}
                       className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm px-3 py-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                     >
                       <option value="">Sin villa</option>
                       {villasData?.villas?.map((villa) => (
-                        <option key={villa.id} value={villa.id}>
-                          {villa.nombre} - {villa.comunaNombre}
+                        <option key={villa?.id} value={villa?.id}>
+                          {villa?.nombre} - {villa?.comunaNombre}
                         </option>
                       ))}
                     </select>
@@ -371,7 +371,7 @@ export default function EditUser() {
                     <select
                       name="sector"
                       id="sector"
-                      value={formData.sector || ''}
+                      value={formData?.sector || ''}
                       onChange={handleChange}
                       className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm px-3 py-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                     >
@@ -387,7 +387,7 @@ export default function EditUser() {
                       type="text"
                       name="sector"
                       id="sector"
-                      value={formData.sector}
+                      value={formData?.sector}
                       onChange={handleChange}
                       placeholder="Ej: Sector A, Plaza Central"
                       className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm px-3 py-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
@@ -414,7 +414,7 @@ export default function EditUser() {
                     name="direccion"
                     id="direccion"
                     rows={2}
-                    value={formData.direccion}
+                    value={formData?.direccion}
                     onChange={handleChange}
                     placeholder="Calle, número, comuna"
                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm px-3 py-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
@@ -431,7 +431,7 @@ export default function EditUser() {
                     name="latitud"
                     id="latitud"
                     placeholder="-33.4489"
-                    value={formData.latitud}
+                    value={formData?.latitud}
                     onChange={handleChange}
                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm px-3 py-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                   />
@@ -447,7 +447,7 @@ export default function EditUser() {
                     name="longitud"
                     id="longitud"
                     placeholder="-70.6693"
-                    value={formData.longitud}
+                    value={formData?.longitud}
                     onChange={handleChange}
                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm px-3 py-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                   />

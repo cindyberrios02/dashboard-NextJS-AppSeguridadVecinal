@@ -138,7 +138,7 @@ export default function Dashboard() {
               Dashboard {isAdminVilla() && `- ${user.villaNombre}`}
             </h1>
             <p className="mt-1 text-sm text-gray-600">
-              {isSuperAdmin() ? 'Vista general de todas las villas' : `Gestión de ${user.villaNombre}`}
+            {isSuperAdmin() ? 'Vista general de todas las villas' : `Gestión de ${user?.villaNombre || 'tu villa'}`}
             </p>
           </div>
           {isAdminVilla() && (

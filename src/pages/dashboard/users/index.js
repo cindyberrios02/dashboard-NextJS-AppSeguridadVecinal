@@ -106,9 +106,9 @@ export default function UsersIndex() {
         <div className="sm:flex sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-semibold text-gray-900">Gestión de Usuarios</h1>
-            <p className="mt-1 text-sm text-gray-600">
-              {isSuperAdmin() 
-                ? 'Administra todos los usuarios del sistema' 
+            <p className="mt-2 text-sm text-gray-700">
+              {isSuperAdmin()
+                ? 'Administra todos los usuarios del sistema'
                 : `Administra usuarios de ${currentUser?.villaNombre || 'tu villa'}`
               }
             </p>
@@ -211,7 +211,7 @@ export default function UsersIndex() {
                           <div className="flex items-center">
                             <div>
                               <div className="text-sm font-medium text-gray-900">
-                                {user.nombre} {user.apellido}
+                                {user?.nombre} {user?.apellido}
                               </div>
                               <div className="text-sm text-gray-500">{user.email}</div>
                             </div>
@@ -220,8 +220,8 @@ export default function UsersIndex() {
                         <td className="px-6 py-4 whitespace-nowrap">
                           {canChangeRoles() ? (
                             <select
-                              value={user.role}
-                              onChange={(e) => handleRoleChange(user.usuarioId, e.target.value)}
+                              value={user?.role}
+                              onChange={(e) => handleRoleChange(user?.usuarioId, e.target.value)}
                               className="text-xs rounded-full border-gray-300 focus:ring-blue-500 focus:border-blue-500"
                             >
                               <option value="VECINO">Vecino</option>
@@ -236,14 +236,14 @@ export default function UsersIndex() {
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center text-sm text-gray-900">
                               <BuildingOfficeIcon className="h-4 w-4 mr-1 text-gray-400" />
-                              {user.villaNombre || 'Sin villa'}
+                              {user?.villaNombre || 'Sin villa'}
                             </div>
                           </td>
                         )}
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center text-sm text-gray-500">
                             <MapPinIcon className="h-4 w-4 mr-1 text-gray-400" />
-                            {user.sector || 'Sin sector'}
+                            {user?.sector || 'Sin sector'}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -278,18 +278,18 @@ export default function UsersIndex() {
                             }`}
                           >
                             <ShieldCheckIcon className="h-4 w-4 mr-1" />
-                            {user.verificado ? 'Verificado' : 'Pendiente'}
+                            {user?.verificado ? 'Verificado' : 'Pendiente'}
                           </button>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <button
-                            onClick={() => router.push(`/dashboard/users/${user.usuarioId}`)}
+                            onClick={() => router.push(`/dashboard/users/${user?.usuarioId}`)}
                             className="text-blue-600 hover:text-blue-900 mr-3"
                           >
                             Ver
                           </button>
                           <button
-                            onClick={() => router.push(`/dashboard/users/${user.usuarioId}/edit`)}
+                            onClick={() => router.push(`/dashboard/users/${user?.usuarioId}/edit`)}
                             className="text-indigo-600 hover:text-indigo-900"
                           >
                             <PencilIcon className="h-4 w-4 inline" />
