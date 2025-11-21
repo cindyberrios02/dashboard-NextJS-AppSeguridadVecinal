@@ -1,18 +1,22 @@
 // src/components/layout/Sidebar.js
 import Link from 'next/link';
+import { ChartBarIcon } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/router';
 import {
   HomeIcon,
   UsersIcon,
   ChartBarIcon,
   CogIcon,
-  XMarkIcon
+  BellIcon,      // ✅ Agregar
+  MapIcon,       // ✅ Agregar si no está
 } from '@heroicons/react/24/outline';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
   { name: 'Usuarios', href: '/dashboard/users', icon: UsersIcon },
-  { name: 'Reportes', href: '/dashboard/reports', icon: ChartBarIcon },
+  { name: 'Alertas', href: '/dashboard/alertas', icon: BellIcon },
+  { name: 'Analytics Alertas', href: '/dashboard/alertas/analytics', icon: ChartBarIcon }, // ✅ NUEVO
+  { name: 'Geografía', href: '/dashboard/geografia', icon: MapIcon },
   { name: 'Configuración', href: '/dashboard/settings', icon: CogIcon },
 ];
 
