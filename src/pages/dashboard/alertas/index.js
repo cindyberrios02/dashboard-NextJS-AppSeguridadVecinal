@@ -42,29 +42,37 @@ export default function AlertasPage() {
   }, []);
 
   const cargarAlertas = async (showLoading = true) => {
-    try {
-      if (showLoading) setLoading(true);
-      setError(null);
-      
-      // TODO: Implementar llamada a API cuando esté disponible
-      // const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/alertas`);
-      // const data = await response.json();
-      // setAlertas(data.alertas || []);
-      
-      // Por ahora, datos de ejemplo
-      setAlertas([]);
-      
-    } catch (err) {
-      console.error('Error cargando alertas:', err);
-      if (err.response?.status === 403 || err.response?.status === 401) {
-        setError('Error de autenticación. Por favor inicia sesión.');
-      } else {
-        setError(`Error al conectar con el servidor: ${err.message}`);
+  try {
+    if (showLoading) setLoading(true);
+    setError(null);
+    
+    // ✅ Llamar a la API real
+    const token = localStorage.getItem('accessToken');
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8082'}/api/alertas?page=0&size=100`,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
       }
-    } finally {
-      if (showLoading) setLoading(false);
+    );
+    
+    if (!response.ok) {
+      throw new Error(`Error: ${response.status}`);
     }
-  };
+    
+    const data = await response.json();
+    console.log('📥 Alertas cargadas:', data);
+    setAlertas(data.content || data.alertas || []);
+    
+  } catch (err) {
+    console.error('Error cargando alertas:', err);
+    setError(`Error al cargar alertas: ${err.message}`);
+  } finally {
+    if (showLoading) setLoading(false);
+  }
+};
 
   // Aplicar filtros
   const alertasFiltradas = alertas.filter((alerta) => {
