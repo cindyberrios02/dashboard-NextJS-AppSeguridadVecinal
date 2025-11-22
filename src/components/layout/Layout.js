@@ -9,6 +9,8 @@ import {
   UsersIcon,
   MapIcon,
   Cog6ToothIcon,
+  BellIcon,
+  ChartBarIcon,
   ArrowRightOnRectangleIcon,
   Bars3Icon,
   XMarkIcon,
@@ -24,6 +26,13 @@ export default function Layout({ children }) {
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
     { name: 'Usuarios', href: '/dashboard/users', icon: UsersIcon },
+    // Opciones visibles solo para SUPER_ADMIN
+    ...(isSuperAdmin
+      ? [
+          { name: 'Alertas', href: '/dashboard/alertas', icon: BellIcon },
+          { name: 'Analytics', href: '/dashboard/alertas/analytics', icon: ChartBarIcon },
+        ]
+      : []),
     { name: 'Geografía', href: '/dashboard/geografia', icon: MapIcon },
     { name: 'Configuración', href: '/dashboard/settings', icon: Cog6ToothIcon },
   ];
@@ -33,8 +42,38 @@ export default function Layout({ children }) {
     router.push('/login');
   };
 
+  // Determina el item activo usando la coincidencia más específica (prefijo más largo)
+  const getBestMatchHref = (items, pathname) => {
+    if (!pathname) return null;
+    // Normalizar: quitar barra final excepto en la raíz
+    const normalize = (p) => (p && p.length > 1 && p.endsWith('/') ? p.slice(0, -1) : p);
+    const pn = normalize(pathname);
+
+    let best = null;
+    let bestLen = -1;
+
+    items.forEach((it) => {
+      const href = normalize(it.href);
+      if (!href) return;
+      const exact = pn === href;
+      const isParent = pn.startsWith(href + '/');
+      if (exact || isParent) {
+        if (href.length > bestLen) {
+          best = href;
+          bestLen = href.length;
+        }
+      }
+    });
+
+    return best;
+  };
+
+  const activeHref = getBestMatchHref(navigation, router.pathname);
+
   const isActive = (href) => {
-    return router.pathname === href || router.pathname.startsWith(href + '/');
+    // comparar con href normalizado
+    const normalize = (p) => (p && p.length > 1 && p.endsWith('/') ? p.slice(0, -1) : p);
+    return normalize(href) === activeHref;
   };
 
   return (
