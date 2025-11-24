@@ -190,6 +190,11 @@ export default function UsersIndex() {
                           Villa
                         </th>
                       )}
+                      {isSuperAdmin() && (
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Comuna
+                        </th>
+                      )}
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Sector
                       </th>
@@ -237,6 +242,14 @@ export default function UsersIndex() {
                             <div className="flex items-center text-sm text-gray-900">
                               <BuildingOfficeIcon className="h-4 w-4 mr-1 text-gray-400" />
                               {user?.villaNombre || 'Sin villa'}
+                            </div>
+                          </td>
+                        )}
+                        {isSuperAdmin() && (
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center text-sm text-gray-900">
+                              <BuildingOfficeIcon className="h-4 w-4 mr-1 text-gray-400" />
+                              {user?.comunaNombre || 'Sin comuna'}
                             </div>
                           </td>
                         )}

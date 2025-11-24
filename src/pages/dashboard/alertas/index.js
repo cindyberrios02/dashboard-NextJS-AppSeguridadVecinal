@@ -1,91 +1,107 @@
-// src/pages/dashboard/alertas/index.js
+// src/pages/dashboard/alertas/index.js - VERSIÓN CORREGIDA
+
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '@/components/layout/Layout';
-import { useAuth } from '@/contexts/AuthContext';
 import { 
-  ExclamationTriangleIcon, 
-  BellAlertIcon,
-  ClockIcon,
-  MapPinIcon,
-  UserIcon
+  BellAlertIcon, 
+  MapPinIcon, 
+  UserIcon, 
+  ClockIcon, 
+  ExclamationTriangleIcon 
 } from '@heroicons/react/24/outline';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
 export default function AlertasPage() {
   const router = useRouter();
-  const { user } = useAuth();
   const [alertas, setAlertas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
+  
   // Filtros
   const [filtroTipo, setFiltroTipo] = useState('TODOS');
   const [filtroEstado, setFiltroEstado] = useState('TODOS');
+  const [filtroComuna, setFiltroComuna] = useState('TODOS');
   const [filtroSector, setFiltroSector] = useState('TODOS');
 
   useEffect(() => {
-    const token = localStorage.getItem('accessToken');
+    cargarAlertas();
     
-    if (token) {
-      cargarAlertas();
-      
-      // Auto-refresh cada 30 segundos
-      const interval = setInterval(() => {
-        cargarAlertas(false);
-      }, 30000);
+    // Auto-refresh cada 30 segundos
+    const interval = setInterval(() => {
+      cargarAlertas(false);
+    }, 30000);
 
-      return () => clearInterval(interval);
-    } else {
-      setError('No hay sesión activa. Por favor inicia sesión.');
-      setLoading(false);
-    }
+    return () => clearInterval(interval);
   }, []);
 
   const cargarAlertas = async (showLoading = true) => {
-  try {
-    if (showLoading) setLoading(true);
-    setError(null);
-    
-    // ✅ Llamar a la API real
-    const token = localStorage.getItem('accessToken');
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8082'}/api/alertas?page=0&size=100`,
-      {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-    
-    if (!response.ok) {
-      throw new Error(`Error: ${response.status}`);
-    }
-    
-    const data = await response.json();
-    console.log('📥 Alertas cargadas:', data);
-    setAlertas(data.content || data.alertas || []);
-    
-  } catch (err) {
-    console.error('Error cargando alertas:', err);
-    setError(`Error al cargar alertas: ${err.message}`);
-  } finally {
-    if (showLoading) setLoading(false);
-  }
-};
+    try {
+      if (showLoading) setLoading(true);
+      setError(null);
 
-  // Aplicar filtros
+      console.log('🔍 Cargando alertas desde:', `${API_URL}/api/alertas/activas`);
+
+      const response = await fetch(`${API_URL}/api/alertas/activas`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include', // ✅ Importante para cookies de sesión
+      });
+
+      console.log('📥 Response status:', response.status);
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Sesión expirada. Por favor inicia sesión.');
+        }
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('✅ Data recibida:', data);
+
+      // ✅ Manejar diferentes formatos de respuesta del backend
+      let alertasArray = [];
+      
+      if (data.alertas && Array.isArray(data.alertas)) {
+        alertasArray = data.alertas;
+      } else if (Array.isArray(data)) {
+        alertasArray = data;
+      } else if (data.content && Array.isArray(data.content)) {
+        alertasArray = data.content;
+      }
+
+      console.log(`📊 Total alertas cargadas: ${alertasArray.length}`);
+      setAlertas(alertasArray);
+
+    } catch (err) {
+      console.error('❌ Error al cargar alertas:', err);
+      setError(err.message);
+    } finally {
+      if (showLoading) setLoading(false);
+    }
+  };
+
+  // ✅ Aplicar filtros
   const alertasFiltradas = alertas.filter((alerta) => {
     if (filtroTipo !== 'TODOS' && alerta.tipo !== filtroTipo) return false;
     if (filtroEstado !== 'TODOS' && alerta.estado !== filtroEstado) return false;
+    if (filtroComuna !== 'TODOS' && alerta.comuna !== filtroComuna) return false;
     if (filtroSector !== 'TODOS' && alerta.sector !== filtroSector) return false;
     return true;
   });
 
-  // Obtener sectores únicos
+  // ✅ Obtener valores únicos para filtros
+  const comunasUnicas = Array.from(
+    new Set(alertas.map((a) => a.comuna).filter(Boolean))
+  ).sort();
+
   const sectoresUnicos = Array.from(
     new Set(alertas.map((a) => a.sector).filter(Boolean))
-  );
+  ).sort();
 
   // Contar alertas por estado
   const contarPorEstado = (estado) => 
@@ -172,6 +188,26 @@ export default function AlertasPage() {
               </select>
             </div>
 
+            {/* Filtro por Comuna */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Comuna
+              </label>
+              <select
+                value={filtroComuna}
+                onChange={(e) => setFiltroComuna(e.target.value)}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={comunasUnicas.length === 0}
+              >
+                <option value="TODOS">Todas las comunas</option>
+                {comunasUnicas.map((comuna) => (
+                  <option key={comuna} value={comuna}>
+                    {comuna}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             {/* Filtro por Sector */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -186,22 +222,22 @@ export default function AlertasPage() {
                 <option value="TODOS">Todos los sectores</option>
                 {sectoresUnicos.map((sector) => (
                   <option key={sector} value={sector}>
-                    {sector}
+                    Sector {sector}
                   </option>
                 ))}
               </select>
             </div>
-
-            {/* Botón Refrescar */}
-            <div className="flex items-end">
-              <button
-                onClick={() => cargarAlertas()}
-                disabled={loading}
-                className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:opacity-50"
-              >
-                🔄 Refrescar
-              </button>
-            </div>
+          </div>
+          
+          {/* Botón Refrescar */}
+          <div className="mt-4">
+            <button
+              onClick={() => cargarAlertas()}
+              disabled={loading}
+              className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? '🔄 Actualizando...' : '🔄 Refrescar'}
+            </button>
           </div>
         </div>
 
@@ -231,7 +267,15 @@ export default function AlertasPage() {
           </div>
         </div>
 
-        {/* Lista de Alertas o Estado Vacío */}
+        {/* Debug Info */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <p className="text-xs text-blue-700 font-mono">
+            🔍 Debug: Total alertas: {alertas.length} | Filtradas: {alertasFiltradas.length} | 
+            Comunas disponibles: {comunasUnicas.length} | Sectores disponibles: {sectoresUnicos.length}
+          </p>
+        </div>
+
+        {/* Lista de Alertas */}
         <div className="bg-white rounded-lg shadow">
           {alertasFiltradas.length === 0 ? (
             <div className="p-12 text-center">
@@ -242,11 +286,14 @@ export default function AlertasPage() {
                   ? 'No hay alertas registradas en el sistema'
                   : 'No hay alertas que coincidan con los filtros seleccionados'}
               </p>
-              <div className="mt-6">
-                <span className="inline-flex items-center px-3 py-0.5 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
-                  Módulo en desarrollo
-                </span>
-              </div>
+              {alertas.length === 0 && (
+                <button
+                  onClick={() => cargarAlertas()}
+                  className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                >
+                  Recargar
+                </button>
+              )}
             </div>
           ) : (
             <div className="divide-y divide-gray-200">
@@ -265,16 +312,24 @@ export default function AlertasPage() {
   );
 }
 
-// Componente para mostrar cada alerta
+// Componente AlertaCard
 function AlertaCard({ alerta, onClick }) {
   const getBadgeColor = (estado) => {
     switch (estado) {
-      case 'ACTIVA': return 'bg-red-100 text-red-800';
-      case 'EN_PROCESO': return 'bg-yellow-100 text-yellow-800';
-      case 'ATENDIDA': return 'bg-green-100 text-green-800';
-      case 'FALSA': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'ACTIVA': return 'bg-red-100 text-red-800 border-red-200';
+      case 'EN_PROCESO': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'ATENDIDA': return 'bg-green-100 text-green-800 border-green-200';
+      case 'FALSA': return 'bg-gray-100 text-gray-800 border-gray-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
+  };
+
+  const getUbicacionCompleta = () => {
+    const partes = [];
+    if (alerta.ciudad) partes.push(alerta.ciudad);
+    if (alerta.comuna) partes.push(alerta.comuna);
+    if (alerta.sector) partes.push(`Sector ${alerta.sector}`);
+    return partes.length > 0 ? partes.join(' > ') : 'Sin ubicación';
   };
 
   return (
@@ -284,42 +339,77 @@ function AlertaCard({ alerta, onClick }) {
     >
       <div className="flex items-start justify-between">
         <div className="flex-1">
-          <div className="flex items-center space-x-3">
-            <h3 className="text-lg font-medium text-gray-900">{alerta.tipo}</h3>
-            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getBadgeColor(alerta.estado)}`}>
+          {/* Título y Estado */}
+          <div className="flex items-center space-x-3 mb-2">
+            <h3 className="text-lg font-medium text-gray-900">
+              {alerta.tipoTitulo || alerta.tipo || 'ALERTA'}
+            </h3>
+            <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getBadgeColor(alerta.estado)}`}>
               {alerta.estado}
             </span>
           </div>
           
-          <div className="mt-2 space-y-1">
-            {alerta.descripcion && (
-              <p className="text-sm text-gray-600">{alerta.descripcion}</p>
-            )}
-            
-            <div className="flex items-center space-x-4 text-sm text-gray-500">
+          {/* Descripción */}
+          {(alerta.descripcion || alerta.tipoDescripcion) && (
+            <p className="text-sm text-gray-600 mb-3">
+              {alerta.descripcion || alerta.tipoDescripcion}
+            </p>
+          )}
+          
+          {/* Badges de ubicación */}
+          {(alerta.ciudad || alerta.comuna || alerta.sector) && (
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              {alerta.ciudad && (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                  🏙️ {alerta.ciudad}
+                </span>
+              )}
+              {alerta.comuna && (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700 border border-green-200">
+                  🏘️ {alerta.comuna}
+                </span>
+              )}
               {alerta.sector && (
-                <div className="flex items-center">
-                  <MapPinIcon className="h-4 w-4 mr-1" />
-                  {alerta.sector}
-                </div>
-              )}
-              {alerta.usuarioNombre && (
-                <div className="flex items-center">
-                  <UserIcon className="h-4 w-4 mr-1" />
-                  {alerta.usuarioNombre}
-                </div>
-              )}
-              {alerta.fechaCreacion && (
-                <div className="flex items-center">
-                  <ClockIcon className="h-4 w-4 mr-1" />
-                  {new Date(alerta.fechaCreacion).toLocaleString('es-CL')}
-                </div>
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-50 text-orange-700 border border-orange-200">
+                  🔷 Sector {alerta.sector}
+                </span>
               )}
             </div>
+          )}
+          
+          {/* Información adicional */}
+          <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
+            <div className="flex items-center">
+              <MapPinIcon className="h-4 w-4 mr-1.5 flex-shrink-0" />
+              <span className="font-medium">{getUbicacionCompleta()}</span>
+            </div>
+            
+            {(alerta.nombreUsuario || alerta.apellidoUsuario) && (
+              <div className="flex items-center">
+                <UserIcon className="h-4 w-4 mr-1.5 flex-shrink-0" />
+                <span>{alerta.nombreUsuario} {alerta.apellidoUsuario}</span>
+              </div>
+            )}
+            
+            {alerta.fechaHora && (
+              <div className="flex items-center">
+                <ClockIcon className="h-4 w-4 mr-1.5 flex-shrink-0" />
+                <span>{new Date(alerta.fechaHora).toLocaleString('es-CL', {
+                  day: '2-digit',
+                  month: '2-digit',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}</span>
+              </div>
+            )}
           </div>
         </div>
         
-        <ExclamationTriangleIcon className="h-6 w-6 text-gray-400" />
+        {/* Ícono de alerta */}
+        <ExclamationTriangleIcon className={`h-8 w-8 flex-shrink-0 ${
+          alerta.estado === 'ACTIVA' ? 'text-red-500' : 'text-gray-400'
+        }`} />
       </div>
     </div>
   );
