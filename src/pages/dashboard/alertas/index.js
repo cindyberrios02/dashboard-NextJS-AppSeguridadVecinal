@@ -97,9 +97,11 @@ export default function AlertasPage() {
       setErrorInforme(null);
       setInforme(null);
 
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8082';
+
       // Endpoint fijo para servicio de informes IA según requerimiento
       // Debe ser POST con body {} según especificación del backend
-      const response = await fetch('http://localhost:8082/api/alertas/informe', {
+      const response = await fetch(`${API_URL}/api/alertas/informe`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
