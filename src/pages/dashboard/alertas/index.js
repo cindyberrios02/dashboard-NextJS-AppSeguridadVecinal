@@ -1,6 +1,7 @@
 // src/pages/dashboard/alertas/index.js - VERSIÓN CORREGIDA
 
 import { useState, useEffect } from 'react';
+import Markdown from 'react-markdown';
 import { useRouter } from 'next/router';
 import Layout from '@/components/layout/Layout';
 import { 
@@ -18,6 +19,10 @@ export default function AlertasPage() {
   const [alertas, setAlertas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  // Informe IA
+  const [informe, setInforme] = useState(null);
+  const [loadingInforme, setLoadingInforme] = useState(false);
+  const [errorInforme, setErrorInforme] = useState(null);
   
   // Filtros
   const [filtroTipo, setFiltroTipo] = useState('TODOS');
@@ -82,6 +87,35 @@ export default function AlertasPage() {
       setError(err.message);
     } finally {
       if (showLoading) setLoading(false);
+    }
+  };
+
+  // Llamar al backend para generar informe IA
+  const generarInforme = async () => {
+    try {
+      setLoadingInforme(true);
+      setErrorInforme(null);
+      setInforme(null);
+
+      // Endpoint fijo para servicio de informes IA según requerimiento
+      // Debe ser POST con body {} según especificación del backend
+      const response = await fetch('http://localhost:8082/api/alertas/informe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      setInforme(data);
+    } catch (e) {
+      setErrorInforme(e.message || 'Error al generar el informe');
+    } finally {
+      setLoadingInforme(false);
     }
   };
 
@@ -267,12 +301,65 @@ export default function AlertasPage() {
           </div>
         </div>
 
-        {/* Debug Info */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <p className="text-xs text-blue-700 font-mono">
-            🔍 Debug: Total alertas: {alertas.length} | Filtradas: {alertasFiltradas.length} | 
-            Comunas disponibles: {comunasUnicas.length} | Sectores disponibles: {sectoresUnicos.length}
-          </p>
+        {/* IA Info + Generador de Informe */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
+          <div className="flex items-center justify-items-start flex-wrap gap-3 ms-2">
+
+
+            <button
+              onClick={generarInforme}
+              disabled={loadingInforme}
+              className="inline-flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+              title="Generar Informe con IA"
+            >
+              <img src="/gemini-color.png" alt="IA" className="w-5 h-5" />
+              {loadingInforme ? 'Generando...' : 'Generar Informe con IA'}
+              {loadingInforme && (
+                <span className="ml-1 inline-block h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              )}
+            </button>
+          </div>
+
+          {errorInforme && (
+            <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded p-2">
+              {errorInforme}
+            </div>
+          )}
+
+          {informe && (
+            <div className="bg-white border border-blue-200 rounded p-3 space-y-2">
+              <div className="text-sm text-gray-700">
+                <span className="font-semibold">Estado:</span> {informe.status || 'N/D'}
+              </div>
+              {typeof informe.totalAlertas !== 'undefined' && (
+                <div className="text-sm text-gray-700">
+                  <span className="font-semibold">Total alertas:</span> {informe.totalAlertas}
+                </div>
+              )}
+              {informe.filtros && (
+                <div className="text-xs text-gray-600">
+                  <span className="font-semibold">Rango:</span> {informe.filtros.fechaInicio} — {informe.filtros.fechaFin}
+                </div>
+              )}
+
+              {informe.informeAi && (
+                <div className="mt-2">
+                  <div className="text-sm font-semibold text-gray-800 mb-1">Informe IA</div>
+                  <div className="text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded p-2">
+                    <Markdown>{informe.informeAi}</Markdown>
+                  </div>
+                </div>
+              )}
+
+              {/* Toggle para ver JSON completo */}
+              <details className="mt-2">
+                <summary className="text-xs text-blue-700 cursor-pointer">Ver JSON completo</summary>
+                <pre className="text-xs mt-2 whitespace-pre-wrap bg-gray-50 p-2 rounded border border-gray-200 overflow-auto">
+{JSON.stringify(informe, null, 2)}
+                </pre>
+              </details>
+            </div>
+          )}
         </div>
 
         {/* Lista de Alertas */}

@@ -39,3 +39,10 @@ a {
 .animate-spin {
   animation: spin 1s linear infinite;
 }
+
+.icono-contenido {
+    width: 24px; /* O el tamaño que necesites para un ícono */
+    height: 24px;
+    vertical-align: middle; /* Para que se alinee bien con el texto */
+    margin-right: 5px;
+}
